@@ -13,6 +13,8 @@ Current state (source of truth in local `board-automation/` folder, built 2026-0
 * `board-nightly-sync.yml` is a daily safety net that backfills missed items and blank statuses
 * `README.md` documents manual setup for a new org or personal board
 
+Scope note: the local `board-automation/` folder is reference v0. It is not REQUIRED to conform to this SPEC. Conformance applies to new code built in this repo from the task list onward.
+
 State machine to preserve. Implementations MUST implement all rows. The close keyword set is fixed and normative: `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, followed by `#N`, case insensitive, same repo only:
 
 | Event | Result |
@@ -35,7 +37,7 @@ Target users:
 
 Success for v1: a stranger MUST be able to go from project number plus repo list to working automation with one setup command plus merged caller files, without hand editing GraphQL ids.
 
-Install timing budget: the setup script MUST complete in under 60 seconds on a normal broadband connection excluding time waiting for the user to paste a token. The first card MUST appear on the board within 90 seconds of opening a test issue, measured from the triggering event timestamp to the card visible via the API.
+Install timing target: the setup script SHOULD complete in under 60 seconds measured from process start to process exit on an Ubuntu runner with network access, excluding time waiting for the user to paste a token. The first card MUST appear on the board within 90 seconds of opening a test issue, measured from the triggering event timestamp to the card visible via the API.
 
 Artifact set and placement. Setup MUST place exactly these files and MUST NOT require any other file copies:
 
@@ -55,17 +57,17 @@ Artifact set and placement. Setup MUST place exactly these files and MUST NOT re
 
 The reusable workflow has exactly two REQUIRED secrets:
 
-* `PROJECT_AUTOMATION_TOKEN`: a fine grained PAT with Projects read and write plus read access to every participating repo, or an App token with equivalent scope. Setup MUST document PAT as the default and MUST set an expiry reminder. Code MUST NOT echo the token.
+* `PROJECT_AUTOMATION_TOKEN`: a fine grained PAT with Projects read and write plus read access to every participating repo, or an App token with equivalent scope. Setup MUST document PAT as the default and MUST accept `--token-expiry YYYY-MM-DD`. Code MUST NOT echo the token.
 * `PROJECT_BOARD_ID`: the opaque ProjectV2 node id starting with `PVT_`. Setup MUST resolve it from owner plus project number and store it. Users MUST NOT hand look it up.
 
-Scope rule: org installs MUST set both values as org secrets so participating repos inherit them with zero per repo secret work, and MUST set the repo list as the `BOARD_REPOS` org variable. Individual installs MUST set both values as repo secrets in the single repo. `PROJECT_BOARD_ID` is the only board derived value that MAY be stored. Field ids starting with `PVTSSF_` or `PVTF_` and single select option ids MUST NOT be stored, configured, or documented as setup outputs. They MAY appear transiently in debug logs as runtime values but MUST NOT be treated as configuration. Setup MUST print the PAT expiry date it was told and the install docs MUST instruct the user to add a calendar reminder before that date.
+Scope rule: org installs MUST set both values as org secrets so participating repos inherit them with zero per repo secret work, and MUST set the repo list as the `BOARD_REPOS` org variable. Individual installs MUST set both values as repo secrets in the single repo. Setup MUST print the `--token-expiry` date it was given plus an instruction to add a calendar reminder before that date, and the install docs MUST repeat that instruction. `PROJECT_BOARD_ID` is the only board derived value that MAY be stored. Field ids starting with `PVTSSF_` or `PVTF_` and single select option ids MUST NOT be stored, configured, or documented as setup outputs. They MAY appear transiently in debug logs as runtime values but MUST NOT be treated as configuration.
 
 ## Commands
 
 ```bash
 # scaffold and setup
 ./scripts/setup.sh --help
-./scripts/setup.sh --owner stbensonimoh --project-number 1 --repos stbensonimoh/my-repo
+./scripts/setup.sh --owner stbensonimoh --project-number 1 --repos stbensonimoh/my-repo --token-expiry 2027-03-01
 
 # lint
 shellcheck scripts/setup.sh
@@ -78,10 +80,12 @@ bats tests/setup.bats
 ./scripts/setup.sh --owner TEST-OWNER --project-number 99 --repos TEST-OWNER/test-repo --dry-run
 
 # E2E checks after install (caller template declares workflow_dispatch with manual inputs)
-gh workflow run "Board sync" --repo OWNER/REPO -f event_name=pull_request_target -f action=opened -f number=1
+gh workflow run "Board sync" --repo OWNER/REPO -f event_name=pull_request_target -f action=opened -f number=1 -f node_id=I_xxx
 gh workflow run "Board nightly sync" --repo OWNER/REPO
 gh issue create --repo OWNER/REPO --title "board test" --body "test"
 ```
+
+Setup MUST document how to obtain `node_id` for manual runs via `gh api repos/OWNER/REPO/issues/NUMBER --jq .node_id`. A dispatch run without `node_id` MUST fail fast with a clear error because the reusable workflow declares it REQUIRED.
 
 The caller template MUST declare `workflow_dispatch` with manual inputs `event_name`, `action`, `number`, and `node_id` in addition to its event triggers, and MUST map each input with `${{ inputs.X || github.event... }}` fallback so a dispatch run supplies the values a push event normally provides. The nightly template MUST declare both `schedule` and `workflow_dispatch`.
 
@@ -99,6 +103,7 @@ README.md                        -> quickstart plus org and individual paths
 scripts/
   setup.sh                       -> installer: lookup ids, ensure options, check Item-closed workflow, set secrets and vars, emit caller
   parse-linked.sh                -> pure close keyword parser taking PR body on stdin or as argument, no network calls
+  board-lib.sh                   -> shared helpers: paginated items query, add item, set Status; sourced by both sync and nightly paths
 tests/
   setup.bats                     -> setup script unit tests
   parse.bats                     -> close keyword parser unit tests sourcing scripts/parse-linked.sh with PR body fixtures
@@ -109,7 +114,7 @@ docs/
   troubleshooting.md             -> 403, 404, missed links, stale status
 ```
 
-There is no `action.yml` sync wrapper in v1. The caller MUST stay thin. All transition logic MUST live in `board-automation.yml` only, with two explicit exemptions: the pure keyword parser in `scripts/parse-linked.sh` is shared parsing help, not transition logic, and the nightly safety net MAY reuse the add item plus set Status helpers with the fixed defaults only and MUST NOT define new transitions.
+There is no `action.yml` sync wrapper in v1. The caller MUST stay thin. All transition logic MUST live in `board-automation.yml` only, with two explicit exemptions: the pure keyword parser in `scripts/parse-linked.sh` is shared parsing help, not transition logic, and the nightly safety net MAY reuse the shared helpers in `scripts/board-lib.sh` with the fixed defaults only and MUST NOT define new transitions. Setup MUST copy each template to its deployed path: `board-sync-template.yml` becomes `.github/workflows/board-sync.yml` and `board-nightly-sync-template.yml` becomes `.github/workflows/board-nightly-sync.yml`. The exact files rule in Success Criteria applies to installed workflow files only, not to tests and docs.
 
 Release tag policy: minor tags such as `v1.1.0` are immutable once pushed. The major tag `v1` moves to the latest `v1.x.y` on every release. Release steps: tag the minor, move the major tag to the same commit, push both. Documented `uses:` lines SHALL reference the moving major tag `v1`. They MUST NOT reference `@main`.
 
@@ -138,9 +143,9 @@ Conventions:
 * `workflow_call` inputs MUST use snake case (`event_name`, `review_state`)
 * Env names MUST use upper snake case (`BOARD`, `REPO`, `NUMBER`)
 * GraphQL mutations MUST use inline literals for ids and MUST keep `-f` variables for user supplied values only. This avoids the known `Type mismatch on variable $o` failure.
-* The close keyword matcher MUST be case insensitive over the exact set `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each followed by `#[0-9]+` with a non digit terminator `([^0-9]|$)`: `grep -oEi '(closes?|closed|fix(es|ed)?|resolves?|resolved)[[:space:]]+#[0-9]+([^0-9]|$)'`
-* The keyword parser MUST live in `scripts/parse-linked.sh`, MUST take the PR body as an input argument or stdin, and MUST perform zero network calls so it is unit testable. Both the reusable workflow and `tests/parse.bats` MUST source or call that file. Implementations MUST NOT require a live API call to test keyword parsing.
-* Pull request events MUST use `pull_request_target` for fork safety. Review events MUST use `pull_request_review` because GitHub does not deliver review activity through `pull_request_target`. Both paths MUST NOT check out code; they SHALL only call the API with event data.
+* The close keyword matcher MUST be case insensitive over the exact set `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each followed by `#[0-9]+` with a non digit terminator `([^0-9]|$)` for containment: `grep -oEi '(closes?|closed|fix(es|ed)?|resolves?|resolved)[[:space:]]+#[0-9]+([^0-9]|$)'`. For extraction the parser MUST then recover digits only, for example piping through `grep -oE '[0-9]+'`, because `grep -oE` includes the terminator in the match.
+* The keyword parser MUST live in `scripts/parse-linked.sh`, MUST take the PR body as an input argument or stdin, and MUST perform zero network calls so it is unit testable. Both the reusable workflow and `tests/parse.bats` MUST call that file. Workflows MAY fetch these trusted helper scripts from the platform repo at the pinned `v1` tag without checking out the triggering repo. Workflows MUST NOT check out the triggering repo code; they SHALL only call the API with event data. Checking out the trusted platform repo at a pinned tag for helpers only is allowed because it never executes untrusted PR code.
+* Pull request events MUST use `pull_request_target` for fork safety. Review events MUST use `pull_request_review` because GitHub does not deliver review activity through `pull_request_target`. Both paths MUST NOT check out the triggering repo code; they SHALL only call the API with event data. Fetching trusted helper scripts from the platform repo at the pinned tag is the only checkout-like action allowed.
 * Workflows MUST define one `concurrency` group per repo plus number: `board-sync-${{ inputs.repository }}-${{ inputs.number }}` with `cancel-in-progress: false`
 
 ## Testing Strategy
@@ -159,7 +164,7 @@ The strategy is lint plus script tests plus live E2E on a test board. The follow
   7. Close PR B unmerged with no other open PR closing the issue, expect issue Todo
   8. Reopen PR B, merge it, expect the linked issue closed and its card Done via the native Item closed workflow
 * Nightly sync test MUST verify: after deleting one board item and blanking one Status, a `workflow_dispatch` run readds the item with the correct default (Backlog for issues, In Progress for PRs) and MUST NOT change any existing Status.
-* Test harness: each E2E run MUST provision a throwaway board with the fixed five options, run setup with `--dry-run` first, then live. Between runs the harness MUST close all test issues and PRs and remove test board items so reruns start clean. Evidence per run MUST be a linked Actions run URL plus a JSON evidence file recording trigger event, item node id, status before, and status after. A PR claiming E2E success MUST link both.
+* Test harness: each E2E run MUST provision a throwaway board with the fixed five options, run setup with `--dry-run` first, then live. Between runs the harness MUST close all test issues and PRs and remove test board items so reruns start clean. Evidence per run MUST be a linked Actions run URL plus a JSON evidence file recording trigger event, item node id, status before, and status after. For the merge to Done check the harness MUST poll the board API for the Done status with a bounded timeout of 60 seconds before capturing evidence, because the native workflow runs asynchronously. A PR claiming E2E success MUST link both.
 * The test matrix MUST cover three configurations, each with its own board plus token: user owned board with private repo, user owned board with public repo, and org owned board with multiple repos. The PR evidence MUST show one passing E2E set per configuration.
 
 ## Boundaries
@@ -167,7 +172,7 @@ The strategy is lint plus script tests plus live E2E on a test board. The follow
 Always (contributors MUST do all of the following):
 
 * Implementations MUST resolve the `Status` field id and option ids at runtime by name on every sync run.
-* Setup MUST ensure `Backlog` and `In Review` exist via a read modify write using the `updateProjectV2Field` mutation: first query all existing options with id, name, and color, then submit the complete list with every existing option echoed back unchanged plus the missing options appended. Setup MUST NOT submit a partial list. A rerun MUST assert existing assignments survive and MUST NOT duplicate options.
+* Setup MUST ensure `Backlog` and `In Review` exist via a read modify write using the `updateProjectV2Field` mutation: first query all existing options with id, name, color, and description, then submit the complete list resubmitted by name, color, and description with every existing option echoed back unchanged plus the missing options appended. GitHub matches existing options by name, so the queried ids MUST be used only for verification and MUST NOT be sent as submission fields. Setup MUST NOT submit a partial list. A rerun MUST assert existing assignments survive and MUST NOT duplicate options.
 * Setup MUST query the board `workflows` connection and verify the native Item closed workflow that moves closed issues to Done is enabled. GitHub provides no API to enable built in workflows, so if it is disabled setup MUST fail with an actionable message telling the user to enable it in the project UI. The install docs MUST include that manual step. The zero hand edit claim covers GraphQL ids only, not this UI toggle.
 * Implementations MUST use fully qualified `owner/repo` slugs in repo lists and API paths. The repo list source defaults to the `BOARD_REPOS` var as a space separated list, for example `REPOS="octo-org/api octo-org/web"`. Bare repo names without an owner MUST NOT be accepted.
 * Implementations MUST paginate both the board items query and the open PRs query with cursor pagination using `pageInfo { hasNextPage endCursor }`. The v0 `first: 100` single page behavior is superseded and MUST NOT be treated as a cap.
