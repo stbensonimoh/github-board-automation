@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run actionlint
+        env:
+          ACTIONLINT_VERSION: v1.7.12
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) "$ACTIONLINT_VERSION"
+          ./actionlint -color
+
+      - name: Run shellcheck
+        env:
+          SHELLCHECK_VERSION: v0.10.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(find scripts -name '*.sh' -type f)
+          if [ -z "$files" ]; then
+            echo "no shell files, skipping"
+            exit 0
+          fi
+          curl -sSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" | tar -xJ
+          echo "$files" | xargs "./shellcheck-${SHELLCHECK_VERSION}/shellcheck" --severity=warning
+
+      - name: Set up bats
+        id: setup-bats
+        uses: bats-core/bats-action@4.0.0
+        with:
+          bats-version: 1.11.0
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run bats tests
+        env:
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
+          TERM: xterm
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find tests -name '*.bats' -type f | grep -q .; then
+            bats tests/
+          else
+            echo "no bats tests yet, skipping"
+          fi
