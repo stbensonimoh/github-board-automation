@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Run actionlint (pinned image digest)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD":/repo -w /repo \
+            rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
+            -color
+
+      - name: Run shellcheck (pinned image digest)
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -d scripts ] || { echo "scripts/ directory missing"; exit 1; }
+          files=$(find scripts tests -name '*.sh' -type f)
+          if [ -z "$files" ]; then
+            echo "no shell files, skipping"
+            exit 0
+          fi
+          # shellcheck disable=SC2046
+          docker run --rm -v "$PWD":/mnt -w /mnt \
+            koalaman/shellcheck@sha256:2097951f02e735b613f4a34de20c40f937a6c8f18ecb170612c88c34517221fb \
+            --severity=warning $(echo "$files" | tr '\n' ' ')
+
+      - name: Set up bats
+        id: setup-bats
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # 4.0.0
+        with:
+          bats-version: 1.11.0
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run bats tests
+        env:
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
+          TERM: xterm
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -d tests ] || { echo "tests/ directory missing"; exit 1; }
+          if find tests -name '*.bats' -type f -print -quit | grep -q .; then
+            bats tests/
+          else
+            echo "no bats tests yet, skipping"
+          fi
