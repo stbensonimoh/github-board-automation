@@ -25,15 +25,22 @@ Moving an issue from Backlog to Todo stays a human decision: that is triage.
 
 ### Step 1. Install two free tools
 
-Open the Terminal app on your Mac (or the terminal on Linux). Paste these two
-commands, one at a time, pressing Enter after each:
+The tools are `gh` (GitHub's command line) and `jq`. How you install them
+depends on your computer:
 
-```
-brew install gh jq
-```
+| Your computer | Open this | Paste this |
+| --- | --- | --- |
+| Mac | Terminal | `brew install gh jq` (if `brew` is not recognized, install Homebrew first from https://brew.sh) |
+| Windows | WSL or Git Bash | `winget install GitHub.cli` then install jq from https://jqlang.github.io/jq/download (jq.exe belongs in your PATH) |
+| Linux | your terminal | `sudo apt install gh jq` (Ubuntu, Debian) or `sudo dnf install gh jq` (Fedora) |
 
-If `brew` is not recognized, install Homebrew first by following the
-instructions at https://brew.sh (one copy-paste command on that page).
+Windows users: the setup script needs a bash shell, so use WSL (recommended,
+one command: `wsl --install` then open the WSL terminal) or Git Bash. If you
+are on Windows Server or something older, see docs/troubleshooting.md.
+
+Not sure what a terminal is? It is the window where you type commands instead
+of clicking buttons. On a Mac, press Command and Space, type Terminal, press
+Enter.
 
 ### Step 2. Sign in to GitHub from the terminal
 
@@ -126,7 +133,8 @@ issues, same repo only, case insensitive.
 
 ## Development
 
-`bats` installs locally with `brew install bats-core`; the two lint gates run
+`bats` installs locally (`brew install bats-core` on a Mac, `apt install
+bats` on Debian or Ubuntu); the two lint gates run
 in Docker, so no local install is needed. Run all three before opening a PR:
 
 ```bash

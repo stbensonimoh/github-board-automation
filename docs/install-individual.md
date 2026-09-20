@@ -5,10 +5,11 @@ about a minute once you have the pieces below.
 
 ## What you need
 
-1. **The terminal tools.** Open a terminal, then paste:
-   ```
-   brew install gh jq
-   ```
+1. **The terminal tools.** How you install them depends on your computer:
+   on a Mac, open Terminal and paste `brew install gh jq`; on Windows use WSL
+   or Git Bash (`winget install GitHub.cli`, then jq from
+   https://jqlang.github.io/jq/download); on Linux paste
+   `sudo apt install gh jq` or `sudo dnf install gh jq`.
 2. **Sign in to GitHub from the terminal:** `gh auth login`. Choose
    GitHub.com, HTTPS, and log in with your browser.
 3. **A project board** on your personal account with at least the columns
