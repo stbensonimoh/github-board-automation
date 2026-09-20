@@ -26,7 +26,7 @@ State machine to preserve. Implementations MUST implement all rows. The close ke
 | Review requested | PR plus linked issues become In Review |
 | Review submitted with changes requested | PR plus linked issues return to In Progress |
 | Review submitted with any other state (approved, commented) | No-op. The workflow MUST ignore it and MUST NOT change any Status |
-| PR closed without merge | Linked issues return to Todo unless another open PR in the same repo still closes them |
+| PR closed without merge | Linked issues that are still open return to Todo unless another open PR in the same repo still closes them; already closed issues keep their card |
 | PR merged | No action. Merge closes issues and the board native Item closed workflow moves cards to Done |
 
 Backlog to Todo triage MUST remain a manual human action. Blocked is not a Status option in v1; teams SHOULD track it with a label as a convention. Code MUST NOT treat Blocked as a board Status value.

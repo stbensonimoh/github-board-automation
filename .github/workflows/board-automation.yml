@@ -144,8 +144,11 @@ jobs:
                 fi
               done <<< "$prs"
               if [ "$found" != "true" ]; then
-                node=$(gh api "repos/$REPO/issues/$n" --jq '.node_id') || { echo "failed to resolve issue #$n" >&2; exit 1; }
-                set_item_status "$node" "$T"
+                issue=$(gh api "repos/$REPO/issues/$n") || { echo "failed to resolve issue #$n" >&2; exit 1; }
+                # an issue that is already closed keeps its card; only open
+                # issues return to Todo (a merged sibling PR may have closed it)
+                [ "$(jq -r .state <<<"$issue")" = "open" ] || continue
+                set_item_status "$(jq -r .node_id <<<"$issue")" "$T"
               fi
             done <<< "$linked"
           }
