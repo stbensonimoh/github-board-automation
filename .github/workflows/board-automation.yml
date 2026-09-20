@@ -34,11 +34,11 @@ on:
       PROJECT_AUTOMATION_TOKEN: { required: true }
       PROJECT_BOARD_ID: { required: true }
 
-# Shared per repo group (SPEC Code Style): serializes sync runs and the
-# nightly on the same repo. The repository value comes from the github
-# context, which in a workflow_call run is the caller repo.
+# Shared repo wide group (SPEC Code Style): one group per repo serializes
+# sync runs with each other and with the nightly. The repository value comes
+# from the github context, which in a workflow_call run is the caller repo.
 concurrency:
-  group: board-${{ github.repository }}-${{ inputs.number }}
+  group: board-${{ github.repository }}
   cancel-in-progress: false
 
 permissions:
@@ -113,18 +113,20 @@ jobs:
           }
 
           link_linked_issues() {
-            local n
+            local n linked
+            linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
             while IFS= read -r n; do
               [ -n "$n" ] || continue
               set_item_status "$(gh api "repos/$REPO/issues/$n" --jq '.node_id')" "$1"
-            done < <(linked_issue_numbers)
+            done <<< "$linked"
           }
 
           # close without merge: linked issues go back to Todo unless another
           # open PR in this repo still closes them
           revert_linked_issues_to_todo() {
-            local n pr_num pr_body found prs
+            local n pr_num pr_body found prs linked
             prs=$(fetch_all_open_prs_jsonl "$REPO")
+            linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
             while IFS= read -r n; do
               [ -n "$n" ] || continue
               found=false
@@ -139,7 +141,7 @@ jobs:
                 fi
               done <<< "$prs"
               [ "$found" = "true" ] || set_item_status "$n" "$T"
-            done < <(linked_issue_numbers)
+            done <<< "$linked"
           }
 
           case "$EVENT" in
