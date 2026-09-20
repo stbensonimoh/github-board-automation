@@ -107,9 +107,11 @@ set_status() {
   gh api graphql -f query="mutation { updateProjectV2ItemFieldValue(input: { projectId: \"$1\", itemId: \"$2\", fieldId: \"$3\", value: { singleSelectOptionId: \"$4\" } }) { projectV2Item { id } } }" > /dev/null
 }
 
-# Used by the e2e reset phase to remove test items from the board.
+# Used by the e2e reset phase to remove test items from the board. The
+# mutation is deleteProjectV2Item (deleteProjectV2ItemById does not exist on
+# Mutation; introspection verified) and takes projectId plus itemId.
 delete_item() {
-  gh api graphql -f query="mutation { deleteProjectV2ItemById(input: { projectId: \"$1\", itemId: \"$2\" }) { deletedItemId } }" > /dev/null
+  gh api graphql -f query="mutation { deleteProjectV2Item(input: { projectId: \"$1\", itemId: \"$2\" }) { deletedItemId } }" > /dev/null
 }
 
 # Blank a Status (singleSelectOptionId: null). Used by the e2e nightly test

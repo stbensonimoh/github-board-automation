@@ -98,7 +98,7 @@ load_harness() {
   gh() {
     printf '%s\n' "$*" >> "$MOCKLOG"
     case "$*" in
-      *"deleteProjectV2ItemById"*) printf '%s' '{"data":{}}' ;;
+      *"deleteProjectV2Item"*) printf '%s' '{"data":{}}' ;;
       *) printf '%s' '' ;;
     esac
   }
@@ -106,8 +106,8 @@ load_harness() {
   grep -q 'pr close 4' "$MOCKLOG"
   grep -q 'pr close 5' "$MOCKLOG"
   grep -q 'issue close 12' "$MOCKLOG"
-  grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_test00000000", itemId: "PVTI_1" })' "$MOCKLOG"
-  grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_test00000000", itemId: "PVTI_2" })' "$MOCKLOG"
+  grep -q 'deleteProjectV2Item(input: { projectId: "PVT_test00000000", itemId: "PVTI_1" })' "$MOCKLOG"
+  grep -q 'deleteProjectV2Item(input: { projectId: "PVT_test00000000", itemId: "PVTI_2" })' "$MOCKLOG"
   # the untracked item is never deleted
   run ! grep -q 'itemId: "PVTI_3"' "$MOCKLOG"
 }
