@@ -95,7 +95,7 @@ mock_gh_board() {
 
 @test "all five options present means no mutation (idempotent rerun)" {
   mock_gh_board
-  run bash "$SETUP" --owner some-user --project-number 1 --repos some-user/repo
+  run bash -c "printf '%s' 'ghp_tok_77' | bash '$SETUP' --owner some-user --project-number 1 --repos some-user/repo --token-expiry 2027-03-01 --individual-mode copy"
   [ "$status" -eq 0 ]
   run ! grep -q 'updateProjectV2Field' "$MOCKLOG"
 }
@@ -105,7 +105,7 @@ mock_gh_board() {
   # restored (to empty) after the call while the export attribute remains
   FIELDS_FIXTURE="fields-three.json"
   mock_gh_board
-  run bash "$SETUP" --owner some-user --project-number 1 --repos some-user/repo
+  run bash -c "printf '%s' 'ghp_tok_78' | bash '$SETUP' --owner some-user --project-number 1 --repos some-user/repo --token-expiry 2027-03-01 --individual-mode copy"
   [ "$status" -eq 0 ]
   local mutation
   mutation=$(grep 'updateProjectV2Field' "$MOCKLOG" | tail -1)
@@ -197,7 +197,7 @@ mock_gh_board() {
 
 @test "enabled Item closed workflow passes" {
   mock_gh_board
-  run bash "$SETUP" --owner some-user --project-number 1 --repos some-user/repo
+  run bash -c "printf '%s' 'ghp_tok_84' | bash '$SETUP' --owner some-user --project-number 1 --repos some-user/repo --token-expiry 2027-03-01 --individual-mode copy"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Item closed workflow enabled"* ]]
 }
