@@ -38,9 +38,9 @@ org secrets; individual installs need repo secrets).
 
 ## The merged card sticks in Todo
 
-The native Item closed workflow is disabled. Enable it in the project
-settings: GitHub provides no API to enable built in workflows. Setup warns
-about this at install time.
+The native Item closed workflow is disabled. Setup stops the install and
+places no secrets until you enable it in the project settings, then rerun
+setup. GitHub provides no API to enable built in workflows.
 
 ## setup says rejecting 'x': repos must be fully qualified OWNER/REPO slugs
 

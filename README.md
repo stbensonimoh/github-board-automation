@@ -11,11 +11,16 @@ In Progress and In Review, closed without merge they return to Todo, and a
 merge hands the card to the board's native Item closed workflow for Done.
 
 ```bash
+git clone https://github.com/stbensonimoh/github-board-automation.git
+cd github-board-automation
 printf '%s' "$TOKEN" | bash scripts/setup.sh \
   --owner YOUR-OWNER --project-number BOARD_NUMBER \
   --repos YOUR-OWNER/YOUR-REPO \
   --individual-mode copy --token-expiry YYYY-MM-DD
 ```
+
+Prerequisites: a clone of this repo (the script reads templates next to
+itself), `gh` CLI logged in, `jq` installed, and a token per the guides below.
 
 Which guide to read:
 
@@ -36,6 +41,7 @@ The board is a state machine:
 | Issue reopened | Todo |
 | PR opened or reopened | PR plus linked issues (same repo close keywords) In Progress |
 | Review requested | In Review |
+| Review approved or commented | no change (no-op) |
 | Changes requested | back to In Progress |
 | PR closed unmerged | linked issues back to Todo unless another open PR still closes them |
 | PR merged | the issue closes and the board's native Item closed workflow moves the card to Done |

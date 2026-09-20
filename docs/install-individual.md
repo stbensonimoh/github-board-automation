@@ -3,6 +3,11 @@
 One repo, one user owned ProjectV2 board. Two modes: copy makes the repo self
 contained; reference pins everything to this platform repo's tag.
 
+## Before you start
+
+A clone of this platform repo (setup reads templates next to itself), `gh` CLI
+logged in as the invoking user, and `jq` installed.
+
 ## Token requirements (read this first)
 
 Fine grained PATs cannot access projects owned by a user account; GitHub lists

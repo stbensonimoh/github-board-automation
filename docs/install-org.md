@@ -6,15 +6,19 @@ per repo secret work.
 
 ## Before you start
 
-1. A fine grained PAT on your account with:
+1. A clone of this platform repo and a checkout: setup reads templates next to
+   itself. `gh` CLI logged in as the invoking user and `jq` installed.
+2. A fine grained PAT on your account with:
    - Resource owner: your org
-   - Organization permissions: Projects, read and write
-   - Repository access: every participating repo, Contents read and write plus
-     Workflows read and write (setup pushes the caller files)
+   - Organization permissions: Projects, Secrets, and Variables, all read and
+     write (setup places the org secrets and the repo list variable)
+   - Repository access: every participating repo with Contents, Workflows,
+     Secrets, Variables, and Pull requests, all read and write (setup pushes
+     the caller files)
    - An expiry date you will actually remember
-2. The ProjectV2 board created in the org with the Status field showing at
+3. The ProjectV2 board created in the org with the Status field showing at
    least the default `Todo`, `In Progress`, `Done`.
-3. The org repos you want on the board, as fully qualified `owner/repo` slugs.
+4. The org repos you want on the board, as fully qualified `owner/repo` slugs.
 
 ## The one command
 
@@ -40,8 +44,9 @@ The PAT is read from stdin and never echoed.
 
 ## After setup
 
-Merge the caller files if setup opened them as pull requests instead of
-pushing directly, then run the walkthrough test:
+Setup commits the caller files directly. If your default branch rejects direct
+commits, add the caller files through a pull request yourself, then run the
+walkthrough test:
 
 1. Open a test issue in one repo: it lands on the board as Backlog
 2. Open a PR whose body says `Closes #N` for that issue: the PR and the issue
