@@ -118,21 +118,24 @@ fetch_item_status() {
 # $1 board, $2 fields json, $3 item rows from fetch_all_items, $4 content
 # node id, $5 default option id.
 write_if_blank() {
-  local line item_id field_id_opt
+  local line item_id field_id_opt live
   field_id_opt=$(printf '%s' "$2" | field_id Status)
   line=$(item_line "$3" "$4")
   if [ -z "$line" ]; then
     item_id=$(add_item "$1" "$4")
-    # addProjectV2ItemById returns the existing item when the content is
-    # already on the board, so the live status can be anything. Re-read.
-    if [ -z "$(fetch_item_status "$item_id")" ]; then
-      set_status "$1" "$item_id" "$field_id_opt" "$5"
-    fi
   else
     item_id=${line%%$'\t'*}
-    if [ -z "$(fetch_item_status "$item_id")" ]; then
-      set_status "$1" "$item_id" "$field_id_opt" "$5"
-    fi
+  fi
+  # Re-read the Status by id immediately before writing in every branch:
+  # addProjectV2ItemById returns the existing item when the content is
+  # already on the board, so the live status can be anything. A failed read
+  # must abort, never count as blank, or the update would overwrite.
+  if ! live=$(fetch_item_status "$item_id"); then
+    printf 'status read failed for item %s\n' "$item_id" >&2
+    return 1
+  fi
+  if [ -z "$live" ]; then
+    set_status "$1" "$item_id" "$field_id_opt" "$5"
   fi
 }
 

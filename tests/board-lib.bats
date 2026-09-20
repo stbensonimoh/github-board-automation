@@ -37,6 +37,16 @@ mock_response() {
   mock_gh "$BATS_TEST_TMPDIR/resp.json"
 }
 
+# Mock gh whose item status read fails like a 403 or timeout would.
+mock_gh_read_fails() {
+  ADD_RESP="$1"
+  gh() {
+    printf '%s\n' "$*" >> "$MOCKLOG"
+    if [[ "$*" == *addProjectV2ItemById* ]]; then printf '%s' "$ADD_RESP"; return 0; fi
+    return 1
+  }
+}
+
 # Mock gh that answers per query shape: $1 for add mutations, $2 for reads.
 mock_gh_seq() {
   ADD_RESP="$1"
@@ -156,6 +166,7 @@ mock_gh_seq() {
   mock_gh_seq '{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_existingItem00"}}}}' '{"data":{"node":{"fieldValueByName":{"name":"Todo"}}}}'
   write_if_blank PVT_board0000000 "$fields" "$lines" I_racedInNode000001 0a6e581e
   grep -q 'addProjectV2ItemById' "$MOCKLOG"
+  grep -q 'item=PVTI_existingItem00' "$MOCKLOG"
   run ! grep -q 'updateProjectV2ItemFieldValue' "$MOCKLOG"
 }
 
@@ -175,6 +186,16 @@ mock_gh_seq() {
   fields="$(cat "$FIXTURES/fields.json")"
   mock_response '{"data":{"node":{"fieldValueByName":{"name":"Todo"}}}}'
   write_if_blank PVT_board0000000 "$fields" "$lines" I_issueNode0000001 0a6e581e
+  run ! grep -qE 'addProjectV2ItemById|updateProjectV2ItemFieldValue' "$MOCKLOG"
+}
+
+@test "write_if_blank aborts when the status read fails and never mutates" {
+  load_lib
+  lines="$(items_extract < "$FIXTURES/items-page1.json")"
+  fields="$(cat "$FIXTURES/fields.json")"
+  mock_gh_read_fails '{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_newItem000000"}}}}'
+  run write_if_blank PVT_board0000000 "$fields" "$lines" PR_pullNode0000001 47fc9ee4
+  [ "$status" -ne 0 ]
   run ! grep -qE 'addProjectV2ItemById|updateProjectV2ItemFieldValue' "$MOCKLOG"
 }
 
