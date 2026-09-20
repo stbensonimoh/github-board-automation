@@ -157,8 +157,10 @@ ensure_status_options() {
   for name in "${need[@]}"; do
     options_gql="$options_gql, {name: $(printf '%s' "$name" | jq -R .), color: GRAY, description: \"\"}"
   done
-  gh api graphql -f query="mutation { updateProjectV2Field(input: { fieldId: \"$fid\", singleSelectOptions: [$options_gql] }) { field { ... on ProjectV2SingleSelectField { options { id name } } } } }" \
-    | jq -r '.data.updateProjectV2Field.field.options | map(.name) | join(", ")' \
+  # the payload's field is projectV2Field, a UNION (ProjectV2FieldConfiguration);
+  # the inline fragment selects the single select member
+  gh api graphql -f query="mutation { updateProjectV2Field(input: { fieldId: \"$fid\", singleSelectOptions: [$options_gql] }) { projectV2Field { ... on ProjectV2SingleSelectField { options { id name } } } } }" \
+    | jq -r '.data.updateProjectV2Field.projectV2Field.options | map(.name) | join(", ")' \
     | { read -r names; echo "Status options now: $names"; }
 }
 

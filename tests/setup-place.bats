@@ -37,7 +37,7 @@ mock_gh_full() {
     done
     case "${rest[*]}" in
       *"updateProjectV2Field"* | *"updateProjectV2ItemFieldValue"* | *"addProjectV2ItemById"*)
-        out='{"data":{"updateProjectV2Field":{"field":{"options":[]}}}}'
+        out='{"data":{"updateProjectV2Field":{"projectV2Field":{"options":[]}}}}'
         ;;
       *"workflows"*)
         out=$(cat "$FIXTURES/$WF_FIXTURE")
