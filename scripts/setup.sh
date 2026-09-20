@@ -40,48 +40,51 @@ DRY_RUN=false
 INDIVIDUAL_MODE=""
 PLATFORM_REPO="stbensonimoh/github-board-automation"
 
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --owner) OWNER="$2"; shift 2 ;;
-    --project-number) PROJECT_NUMBER="$2"; shift 2 ;;
-    --repos)
-      shift
-      [ $# -gt 0 ] || { echo "--repos needs at least one OWNER/REPO slug" >&2; exit 1; }
-      # accept both a quoted "a/b c/d" list and separate slugs; the strict
-      # per slug validation runs after parsing
-      while [ $# -gt 0 ] && [[ ! "$1" == --* ]]; do
-        REPOS="${REPOS:+$REPOS }$1"
+# Parse and validate arguments. Runs only from main, so the script stays
+# sourceable for tests (sourcing defines functions and does nothing else).
+parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --owner) OWNER="$2"; shift 2 ;;
+      --project-number) PROJECT_NUMBER="$2"; shift 2 ;;
+      --repos)
         shift
-      done ;;
-    --token-expiry) TOKEN_EXPIRY="$2"; shift 2 ;;
-    --individual-mode) INDIVIDUAL_MODE="$2"; shift 2 ;;
-    --platform-repo) PLATFORM_REPO="$2"; shift 2 ;;
-    --dry-run) DRY_RUN=true; shift ;;
-    --help|-h) printf '%s\n' "$USAGE"; exit 0 ;;
-    *) echo "unknown argument: $1" >&2; printf '%s\n' "$USAGE" >&2; exit 1 ;;
-  esac
-done
+        [ $# -gt 0 ] || { echo "--repos needs at least one OWNER/REPO slug" >&2; exit 1; }
+        # accept both a quoted "a/b c/d" list and separate slugs; the strict
+        # per slug validation runs after parsing
+        while [ $# -gt 0 ] && [[ ! "$1" == --* ]]; do
+          REPOS="${REPOS:+$REPOS }$1"
+          shift
+        done ;;
+      --token-expiry) TOKEN_EXPIRY="$2"; shift 2 ;;
+      --individual-mode) INDIVIDUAL_MODE="$2"; shift 2 ;;
+      --platform-repo) PLATFORM_REPO="$2"; shift 2 ;;
+      --dry-run) DRY_RUN=true; shift ;;
+      --help|-h) printf '%s\n' "$USAGE"; exit 0 ;;
+      *) echo "unknown argument: $1" >&2; printf '%s\n' "$USAGE" >&2; exit 1 ;;
+    esac
+  done
 
-[ -n "$OWNER" ] || { echo "--owner is required" >&2; printf '%s\n' "$USAGE" >&2; exit 1; }
-[ -n "$PROJECT_NUMBER" ] || { echo "--project-number is required" >&2; printf '%s\n' "$USAGE" >&2; exit 1; }
-[ -n "$REPOS" ] || { echo "--repos is required (space separated OWNER/REPO slugs)" >&2; printf '%s\n' "$USAGE" >&2; exit 1; }
+  [ -n "$OWNER" ] || { echo "--owner is required" >&2; printf '%s\n' "$USAGE" >&2; exit 1; }
+  [ -n "$PROJECT_NUMBER" ] || { echo "--project-number is required" >&2; printf '%s\n' "$USAGE" >&2; exit 1; }
+  [ -n "$REPOS" ] || { echo "--repos is required (space separated OWNER/REPO slugs)" >&2; printf '%s\n' "$USAGE" >&2; exit 1; }
 
-if [ -n "$TOKEN_EXPIRY" ]; then
-  echo "token expiry: $TOKEN_EXPIRY. Add a calendar reminder before this date to rotate the PAT"
-fi
+  # setup auth: the invoking user's gh auth only, never the runtime token
+  [ -z "${PROJECT_AUTOMATION_TOKEN:-}" ] || {
+    echo "PROJECT_AUTOMATION_TOKEN is set; it is runtime only. Unset it and use your own gh auth for setup." >&2
+    exit 1
+  }
 
-# setup auth: the invoking user's gh auth only, never the runtime token
-[ -z "${PROJECT_AUTOMATION_TOKEN:-}" ] || {
-  echo "PROJECT_AUTOMATION_TOKEN is set; it is runtime only. Unset it and use your own gh auth for setup." >&2
-  exit 1
+  if [ -n "$TOKEN_EXPIRY" ]; then
+    echo "token expiry: $TOKEN_EXPIRY. Add a calendar reminder before this date to rotate the PAT"
+  fi
 }
 
 # --- board discovery ---------------------------------------------------------
 
 
 # opaque ProjectV2 node id from owner plus project number; user boards live
-# under user(login:), org boards under organization(login:). Stashes the
-# owner kind in KIND for the install mode decision.
+# under user(login:), org boards under organization(login:).
 # Prints "<owner-kind> <board-id>" on one line. Command substitutions run in
 # a subshell, so a global set inside would never reach the caller; the caller
 # reads both fields with `read` (bash manual: read assigns the input line's
@@ -204,9 +207,12 @@ place_secrets_and_vars() {
 # put_file REPO PATH CONTENT MESSAGE: the contents API call with the content
 # base64 encoded and the commit message plain
 put_file() {
-  gh api --method PUT "repos/$1/contents/$2" \
-    -f message="$4" \
-    -f content="$(printf '%s' "$3" | base64 | tr -d '\n')" > /dev/null
+  # updating an existing file REQUIRES its sha; a fresh path (404) creates it
+  local repo="$1" path="$2" content="$3" message="$4" sha
+  sha=$(gh api "repos/$repo/contents/$path" --jq '.sha // empty' 2>/dev/null || true)
+  local -a args=(-f message="$message" -f content="$(printf '%s' "$content" | base64 | tr -d '\n')")
+  [ -n "$sha" ] && args+=(-f sha="$sha")
+  gh api --method PUT "repos/$repo/contents/$path" "${args[@]}" > /dev/null
 }
 
 # The caller's uses line points at the platform repo's v1 tag; copy mode
@@ -253,6 +259,7 @@ emit_callers() {
 
 # sourceable for tests: functions only, main runs when executed directly
 main() {
+  parse_args "$@"
   # shellcheck disable=SC1091
   source "$SCRIPT_DIR/board-lib.sh"
 

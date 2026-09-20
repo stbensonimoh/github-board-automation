@@ -10,7 +10,8 @@ FIXTURES="$BATS_TEST_DIRNAME/fixtures"
 TOKEN="ghp_test_token_never_echo_12345"
 
 setup() {
-  MOCKLOG="$BATS_TEST_TMPDIR/mock.log"
+  export BATS_TEST_TMPDIR
+  export MOCKLOG="$BATS_TEST_TMPDIR/mock.log"
   : > "$MOCKLOG"
   export MOCKLOG FIXTURES
   export WF_FIXTURE="workflows-enabled.json"
@@ -40,9 +41,7 @@ mock_gh_full() {
       *"updateProjectV2Field"* | *"updateProjectV2ItemFieldValue"* | *"addProjectV2ItemById"*)
         out='{"data":{"updateProjectV2Field":{"projectV2Field":{"options":[]}}}}'
         ;;
-      *"workflows"*)
-        out=$(cat "$FIXTURES/$WF_FIXTURE")
-        ;;
+
       *"fields"*)
         out=$(cat "$FIXTURES/${FIELDS_FIXTURE:-fields-five.json}")
         ;;
@@ -57,7 +56,23 @@ mock_gh_full() {
         out=''
         ;;
       *"contents/"*)
-        out='{"content":{"path":"emitted"}}'
+        # a PUT marks the path as existing (a marker file, not log grepping);
+        # a later GET for a marked path returns the sha, an unmarked one 404s.
+        # the marker keys on the path after contents/ so the GET and the PUT
+        # of the same file compute the same name
+        marker="$BATS_TEST_TMPDIR/put-$(printf '%s' "${rest[*]}" | sed 's|.*contents/||; s| -f .*||' | cksum | cut -d' ' -f1)"
+        if printf '%s' "${rest[*]}" | grep -q -- "--method PUT"; then
+          mkdir -p "$BATS_TEST_TMPDIR/puts"
+          touch "$marker"
+          out='{"content":{"path":"emitted"}}'
+        elif [ -f "$marker" ]; then
+          out='{"sha":"existing_sha_123","content":{}}'
+        else
+          out='{"message":"Not Found"}'
+        fi
+        ;;
+      *"workflows"*)
+        out=$(cat "$FIXTURES/$WF_FIXTURE")
         ;;
       *)
         if [[ "$*" == *"users/org-owner"* ]]; then
@@ -68,10 +83,15 @@ mock_gh_full() {
         ;;
     esac
     # setup's scope pre-flight calls gh -i user; emulate the header block.
-    # GH_SCOPES defaults to a token that has the workflow scope.
+    # GH_SCOPES defaults to a token that has the workflow scope. The if form
+    # is required: a failing [ ] && assignment list inside a for loop under
+    # set -e kills the function (the bash set -e rule) and the mock serves
+    # nothing.
     local header_block=""
     for a in "$@"; do
-      [ "$a" = "-i" ] && header_block="x-oauth-scopes: ${GH_SCOPES:-repo, workflow, project}\n\n"
+      if [ "$a" = "-i" ]; then
+        header_block="x-oauth-scopes: ${GH_SCOPES:-repo, workflow, project}\n\n"
+      fi
     done
     if [ -n "$jq_expr" ]; then
       printf '%s' "$out" | jq -r "$jq_expr"
@@ -99,7 +119,7 @@ run_setup() {
   grep -q 'secret set PROJECT_AUTOMATION_TOKEN --org org-owner' "$MOCKLOG"
   grep -q 'secret set PROJECT_BOARD_ID --org org-owner' "$MOCKLOG"
   grep -q 'variable set BOARD_REPOS --org org-owner' "$MOCKLOG"
-  [ "$(grep -c 'contents/' "$MOCKLOG")" = "3" ]  # 2 callers + 1 nightly (first repo)
+  [ "$(grep -c 'method PUT.*contents/' "$MOCKLOG")" = "3" ]  # 2 callers + 1 nightly (first repo)
   grep -q 'repos/org-owner/api/contents/.github/workflows/board-nightly-sync.yml' "$MOCKLOG"
   [[ "$output" == *"nightly"* ]]
 }
@@ -107,6 +127,7 @@ run_setup() {
 @test "the token never appears in logs or output" {
   mock_gh_full
   run_setup --owner some-user --project-number 1 --repos some-user/repo --individual-mode copy
+  { echo "STATUS: $status"; printf '%s\n' "$output" | tail -4; } > /tmp/t2-debug.txt
   [ "$status" -eq 0 ]
   run ! grep -q "$TOKEN" "$MOCKLOG"
   [[ "$output" != *"$TOKEN"* ]]
@@ -123,7 +144,7 @@ run_setup() {
   grep -q 'repos/some-user/repo/contents/scripts/board-lib.sh' "$MOCKLOG"
   grep -q 'repos/some-user/repo/contents/scripts/parse-linked.sh' "$MOCKLOG"
   # caller uses the same repo reference and the nightly is included
-  [ "$(grep -c 'contents/' "$MOCKLOG")" = "5" ]
+  [ "$(grep -c 'method PUT.*contents/' "$MOCKLOG")" = "5" ]
   grep -q 'repos/some-user/repo/contents/.github/workflows/board-nightly-sync.yml' "$MOCKLOG"
 }
 
@@ -131,10 +152,25 @@ run_setup() {
   mock_gh_full
   run_setup --owner some-user --project-number 1 --repos some-user/repo --individual-mode reference
   [ "$status" -eq 0 ]
-  [ "$(grep -c 'contents/' "$MOCKLOG")" = "1" ]
+  [ "$(grep -c 'method PUT.*contents/' "$MOCKLOG")" = "1" ]
   grep -q 'repos/some-user/repo/contents/.github/workflows/board-sync.yml' "$MOCKLOG"
   run ! grep -q 'board-nightly-sync' "$MOCKLOG"
   run ! grep -q 'board-automation.yml' "$MOCKLOG"
+}
+
+@test "put_file sends the sha when updating an existing file" {
+  source "$SETUP"
+  mock_gh_full
+  # first PUT creates (no sha known); the mock answers GETs with 404 until then
+  put_file some-user/repo .github/workflows/board-sync.yml "content" "msg"
+  local first
+  first=$(grep 'method PUT.*board-sync.yml' "$MOCKLOG" | head -1)
+  [[ "$first" != *'-f sha='* ]] || { echo "created with a sha?"; return 1; }
+  # the file now exists: the second PUT must carry the existing sha
+  put_file some-user/repo .github/workflows/board-sync.yml "content2" "msg2"
+  local second
+  second=$(grep 'method PUT.*board-sync.yml' "$MOCKLOG" | tail -1)
+  [[ "$second" == *'-f sha=existing_sha_123'* ]] || { echo "update missing the sha"; return 1; }
 }
 
 @test "emitted callers point at the platform repo and pin v1" {

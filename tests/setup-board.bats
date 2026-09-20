@@ -11,7 +11,8 @@ SETUP="$BATS_TEST_DIRNAME/../scripts/setup.sh"
 FIXTURES="$BATS_TEST_DIRNAME/fixtures"
 
 setup() {
-  MOCKLOG="$BATS_TEST_TMPDIR/mock.log"
+  export BATS_TEST_TMPDIR
+  export MOCKLOG="$BATS_TEST_TMPDIR/mock.log"
   : > "$MOCKLOG"
   WF_FIXTURE="workflows-enabled.json"
   export MOCKLOG FIXTURES WF_FIXTURE
@@ -63,10 +64,15 @@ mock_gh_board() {
         ;;
     esac
     # setup's scope pre-flight calls gh -i user; emulate the header block.
-    # GH_SCOPES defaults to a token that has the workflow scope.
+    # GH_SCOPES defaults to a token that has the workflow scope. The if form
+    # is required: a failing [ ] && assignment list inside a for loop under
+    # set -e kills the function (the bash set -e rule) and the mock serves
+    # nothing.
     local header_block=""
     for a in "$@"; do
-      [ "$a" = "-i" ] && header_block="x-oauth-scopes: ${GH_SCOPES:-repo, workflow, project}\n\n"
+      if [ "$a" = "-i" ]; then
+        header_block="x-oauth-scopes: ${GH_SCOPES:-repo, workflow, project}\n\n"
+      fi
     done
     if [ -n "$jq_expr" ]; then
       printf '%s' "$out" | jq -r "$jq_expr"
