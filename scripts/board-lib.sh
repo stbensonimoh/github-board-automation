@@ -74,7 +74,7 @@ items_extract() {
 }
 
 # Follows endCursor until hasNextPage is false; emits items_extract rows.
-# All three list loops share one termination contract: stop when the page has
+# All list loops (items, issues, PRs, JSONL PRs) share one termination contract: stop when the page has
 # no next, when the next cursor is empty, or when the next cursor equals the
 # one just sent (a non advancing API). A repeated cursor costs one duplicate
 # fetch; every downstream write is conditional, so that is harmless.

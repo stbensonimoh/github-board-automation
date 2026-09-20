@@ -354,6 +354,9 @@ mock_gh_seq() {
   [ "$(jq -r .number <<<"$first")" = "4" ]
   [ "$(jq -r .body <<<"$first")" = "Fixes: #12 and closes #13" ]
   [ "$(jq -r '.body' <<<"$(printf '%s' "$out" | sed -n 2p)")" = "" ]
+  # jq -c escapes embedded newlines so one object is always one line
+  nl='{"data":{"repository":{"pullRequests":{"nodes":[{"number":7,"body":"one\ntwo"}]}}}}'
+  [ "$(printf '%s' "$nl" | prs_extract_jsonl | wc -l | tr -d ' ')" = "1" ]
 }
 
 @test "fetch_all_open_prs_jsonl follows the cursor across pages" {
