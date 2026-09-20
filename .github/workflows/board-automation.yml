@@ -64,9 +64,9 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: stbensonimoh/github-board-automation
-          # immutable SHA of a commit that already contains scripts/; the
-          # release step updates this to the new immutable v1.x.y tag
-          ref: 1ce14669b5b04f730ce437edba660cfb312ca8f1
+          # immutable v1.x.y tag per the SPEC release policy; the release
+          # step moves this with every release
+          ref: v1.1.0
           sparse-checkout: scripts
           persist-credentials: false
 
