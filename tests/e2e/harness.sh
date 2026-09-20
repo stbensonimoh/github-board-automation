@@ -182,6 +182,8 @@ run_then_status() { # NODE WANT BUDGET BEFORE_RUN_ID
 
 # --- live object helpers --------------------------------------------------------
 
+# Creates the issue and RECORDS it; safe to call bare (the recording writes
+# the caller's arrays, so it must not run inside a command substitution).
 open_test_issue() {
   local url num node
   url=$(gh issue create --repo "$REPO" --title "e2e: state row under test" \
@@ -376,16 +378,21 @@ checks() {
 # Proves the nightly readds a deleted item and fills a blank Status with the
 # default (Backlog for issues) without touching an existing Status.
 nightly_test() {
-  local before num_a node_a node_b items line_a line_b
+  local before num_a num_b node_a node_b items line_a line_b
   local item_a item_b fields elapsed elapsed_b control_status
   fields=$(fetch_fields "$BOARD")
 
   # two fresh issues: A gets deleted, B gets blanked; the Done card from the
-  # checks phase is the untouched control
-  num_a=$(open_test_issue)
-  node_a="${ISSUE_NODES[$(( ${#ISSUE_NODES[@]} - 1 ))]}"
+  # checks phase is the untouched control. open_test_issue records into the
+  # caller's arrays and must never run inside a command substitution: the
+  # appends would die with the subshell.
   open_test_issue
-  node_b="${ISSUE_NODES[$(( ${#ISSUE_NODES[@]} - 1 ))]}"
+  num_a="${ISSUE_NUMBERS[${#ISSUE_NUMBERS[@]} - 1]}"
+  node_a="${ISSUE_NODES[${#ISSUE_NODES[@]} - 1]}"
+  open_test_issue
+  node_b="${ISSUE_NODES[${#ISSUE_NODES[@]} - 1]}"
+  num_b="${ISSUE_NUMBERS[${#ISSUE_NUMBERS[@]} - 1]}"
+  echo "nightly: issue A #$num_a ($node_a), issue B #$num_b ($node_b)"
 
   # reopen A through the real state row so its card is Todo, then blank it:
   # the nightly fills blanks with the default and never infers history
