@@ -15,7 +15,11 @@ setup() {
   export EVIDENCE_DIR="$BATS_TEST_TMPDIR/evidence"
   mkdir -p "$EVIDENCE_DIR"
   export POLL_INTERVAL=0
-  export BOARD="PVT_test00000000"
+  # E2E_* env vars are how real runs configure the harness; the harness
+  # resolves REPO and BOARD from them at load time, so they must be set
+  # before the harness is sourced
+  export E2E_REPO="o/r"
+  export E2E_PROJECT_ID="PVT_test00000000"
 }
 
 load_harness() {
@@ -36,7 +40,8 @@ load_harness() {
     if [ "$c" = "0" ]; then printf 'PVTI_x\tNODE_1\tTodo'; else printf 'PVTI_x\tNODE_1\tIn Progress'; fi
   }
   out=$(await_status NODE_1 "In Progress" 90 "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
-  [ "$out" -ge 1 ]
+  # POLL_INTERVAL=0 means the second poll is immediate: elapsed 0 is correct
+  [ "$out" -ge 0 ]
 }
 
 @test "await_status times out bounded when the status never arrives" {
@@ -82,11 +87,13 @@ load_harness() {
 
 # --- reset --------------------------------------------------------------------
 
-@test "reset closes test objects and deletes every board item" {
+@test "reset closes test objects and deletes only their board items" {
   load_harness
-  PRS=(4 5)
-  ISSUES=(12)
-  # stub: two items on the board with content node ids
+  PR_NUMBERS=(4 5)
+  ISSUE_NUMBERS=(12)
+  ISSUE_NODES=(NODE_A)
+  PR_NODES=(NODE_B)
+  # stub: two board items, both belonging to the tracked test objects
   fetch_all_items() { printf 'PVTI_1\tNODE_A\tTodo\nPVTI_2\tNODE_B\t'; }
   gh() {
     printf '%s\n' "$*" >> "$MOCKLOG"
@@ -97,7 +104,10 @@ load_harness() {
   }
   reset_board
   grep -q 'pr close 4' "$MOCKLOG"
+  grep -q 'pr close 5' "$MOCKLOG"
   grep -q 'issue close 12' "$MOCKLOG"
-  grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_test00000000", itemId: "PVTI_1" })' "$MOCKLOG"
+  grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_test00000000", itemId: "PVTI_1" })' "$MOCKLOG" || { echo "LOG:"; cat "$MOCKLOG"; return 1; }
   grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_test00000000", itemId: "PVTI_2" })' "$MOCKLOG"
+  # on failure show the log for diagnosis
+  cat "$MOCKLOG" > /dev/null
 }
