@@ -1,0 +1,39 @@
+name: Board sync
+
+# Thin per repo caller; setup copies this template to
+# .github/workflows/board-sync.yml (templates live outside that directory so
+# GitHub does not run them). Individual and cross owner callers MUST map both
+# secrets explicitly (as here); same org callers MAY use `secrets: inherit`.
+
+on:
+  issues:
+    types: [opened, reopened]
+  pull_request_target:
+    types: [opened, reopened, closed, review_requested]
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      event_name: { required: true, type: string }
+      action: { required: true, type: string }
+      number: { required: true, type: number }
+      node_id: { required: true, type: string }
+      review_state: { required: false, type: string, default: '' }
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    uses: stbensonimoh/github-board-automation/.github/workflows/board-automation.yml@v1
+    with:
+      event_name: ${{ inputs.event_name || github.event_name }}
+      action: ${{ inputs.action || github.event.action }}
+      number: ${{ inputs.number || github.event.issue.number || github.event.pull_request.number }}
+      node_id: ${{ inputs.node_id || github.event.issue.node_id || github.event.pull_request.node_id }}
+      repository: ${{ github.repository }}
+      merged: ${{ github.event.pull_request.merged == true }}
+      review_state: ${{ inputs.review_state || github.event.review.state }}
+    secrets:
+      PROJECT_AUTOMATION_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
+      PROJECT_BOARD_ID: ${{ secrets.PROJECT_BOARD_ID }}

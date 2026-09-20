@@ -102,8 +102,13 @@ SPEC.md                          -> this file, living source of truth
 README.md                        -> quickstart plus org and individual paths
 .github/workflows/
   board-automation.yml           -> reusable workflow, all transition logic lives here only
-  board-sync-template.yml        -> caller template users copy, declares workflow_dispatch with manual inputs
-  board-nightly-sync-template.yml -> safety net template, reads vars.BOARD_REPOS, no hardcoded repos
+  ci.yml                         -> lint and test gates
+templates/
+  board-sync.yml                 -> caller template users copy, declares workflow_dispatch with manual inputs
+  board-nightly-sync.yml         -> safety net template, reads vars.BOARD_REPOS, no hardcoded repos
+NOTE: templates MUST live outside .github/workflows/ because GitHub runs
+every file in that directory; a template there fires on real events and
+fails on the not yet existing v1 tag. Setup copies them into place.
 scripts/
   setup.sh                       -> installer: lookup ids, ensure options, check Item-closed workflow, set secrets and vars, emit caller
   parse-linked.sh                -> pure close keyword parser taking PR body on stdin or as argument, no network calls
@@ -118,7 +123,7 @@ docs/
   troubleshooting.md             -> 403, 404, missed links, stale status
 ```
 
-There is no `action.yml` sync wrapper in v1. The caller MUST stay thin. The event to status mapping MUST live in `board-automation.yml` only, with two explicit exemptions: the pure keyword parser in `scripts/parse-linked.sh` is shared parsing help, and the mechanical API helpers in `scripts/board-lib.sh` (paginated items query, add item, set Status) MAY be sourced by both the sync path and the nightly path. Helper files MUST NOT define status transitions. Setup MUST copy each template that applies to the chosen mode to its deployed path: `board-sync-template.yml` becomes `.github/workflows/board-sync.yml` and, where the mode includes a nightly, `board-nightly-sync-template.yml` becomes `.github/workflows/board-nightly-sync.yml`. Mode B has no nightly in v1. The exact files rule in Success Criteria applies to installed workflow files only, not to tests and docs.
+There is no `action.yml` sync wrapper in v1. The caller MUST stay thin. The event to status mapping MUST live in `board-automation.yml` only, with two explicit exemptions: the pure keyword parser in `scripts/parse-linked.sh` is shared parsing help, and the mechanical API helpers in `scripts/board-lib.sh` (paginated items query, add item, set Status) MAY be sourced by both the sync path and the nightly path. Helper files MUST NOT define status transitions. Setup MUST copy each template that applies to the chosen mode from `templates/` to its deployed path: `templates/board-sync.yml` becomes `.github/workflows/board-sync.yml` and, where the mode includes a nightly, `templates/board-nightly-sync.yml` becomes `.github/workflows/board-nightly-sync.yml`. Mode B has no nightly in v1. The exact files rule in Success Criteria applies to installed workflow files only, not to tests and docs.
 
 Release tag policy: minor tags such as `v1.1.0` are immutable once pushed. The major tag `v1` moves to the latest `v1.x.y` on every release. Release steps SHALL: update the helper fetch ref in `board-automation.yml` to the new immutable `v1.x.y`, tag the minor, move the major tag to the same commit, push both. Documented `uses:` lines SHALL reference the moving major tag `v1`. Helper fetch lines SHALL reference the immutable `v1.x.y` tag. A commit SHA MAY be used only when it is the SHA of a prior commit that already contains the helper scripts, never the SHA of the commit being created. They MUST NOT reference `@main`.
 
