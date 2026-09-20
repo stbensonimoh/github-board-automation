@@ -91,6 +91,14 @@ Delete the `board-sync.yml` file from that repo's `.github/workflows/` folder
 and remove the repo from the `BOARD_REPOS` list (run the setup command again
 with the shorter list). The board keeps its other repos.
 
+## Plan limitation: free organizations
+
+On GitHub Free, organization secrets are not accessible by private
+repositories; GitHub's docs state this directly. If your org is on the free
+plan, the automation works in org repos that are public. For private repos on
+a free org, either upgrade the org's plan, or rerun setup with the secrets
+placed at repo scope instead. Orgs on Team or Enterprise have no such limit.
+
 ## When the token expires
 
 Setup reminds you of the expiry date. Put it in your calendar. When it gets
