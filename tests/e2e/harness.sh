@@ -169,7 +169,7 @@ run_then_status() { # NODE WANT BUDGET BEFORE_RUN_ID
   local node="$1" want="$2" budget="$3" before="$4" line id url started
   line=$(await_new_run "Board sync" "$before")
   read -r id url started <<< "$line"
-  await_run_completed "$id"
+  await_run_completed "$id" || return 1
   await_status "$node" "$want" "$budget" "$started"
 }
 
@@ -212,7 +212,7 @@ check1_open_issue() {
   open_test_issue
   sleep 5
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "Backlog" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 1 open-issue)" "issues/opened" "${ISSUE_NODES[0]}" "" "Backlog" "$url" "$started" "$elapsed"
   echo "check 1 ok: Backlog in ${elapsed}s"
 }
@@ -224,7 +224,7 @@ check2_reopen_issue() {
   gh issue close "$n" --repo "$REPO"
   gh issue reopen "$n" --repo "$REPO"
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "Todo" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 2 reopen-issue)" "issues/reopened" "${ISSUE_NODES[0]}" "Backlog" "Todo" "$url" "$started" "$elapsed"
   echo "check 2 ok: Todo in ${elapsed}s"
 }
@@ -232,11 +232,11 @@ check2_reopen_issue() {
 # check3: open PR A closing the issue, expect the PR plus the issue In Progress
 check3_open_pr_a() {
   local before url started elapsed_e elapsed_p
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   open_test_pr "${ISSUE_NUMBERS[0]}" "prA"
   elapsed_e=$(run_then_status "${ISSUE_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
   elapsed_p=$(run_then_status "${PR_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 3 open-pr)" "pull_request_target/opened" "${ISSUE_NODES[0]}" "Todo" "In Progress" "$url" "$started" "$elapsed_e"
   evidence "$(evfile 3b open-pr-prcard)" "pull_request_target/opened" "${PR_NODES[0]}" "" "In Progress" "$url" "$started" "$elapsed_p"
   echo "check 3 ok: issue ${elapsed_e}s, PR ${elapsed_p}s"
@@ -246,11 +246,11 @@ check3_open_pr_a() {
 # expect the issue to stay In Progress while B still closes it
 check4_competing_pr() {
   local before url started elapsed
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   open_test_pr "${ISSUE_NUMBERS[0]}" "prB"
   gh pr close "${PR_NUMBERS[0]}" --repo "$REPO" --delete-branch
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 4 competing-pr)" "pull_request_target/closed" "${ISSUE_NODES[0]}" "In Progress" "In Progress" "$url" "$started" "$elapsed"
   echo "check 4 ok: still In Progress in ${elapsed}s"
 }
@@ -258,11 +258,11 @@ check4_competing_pr() {
 # check5: review requested on PR B (synthetic dispatch), expect In Review
 check5_review_requested() {
   local before url started elapsed
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   dispatch "pull_request_target" "review_requested" "${PR_NUMBERS[1]}" "${PR_NODES[1]}"
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "In Review" "$FIRST_CARD_BUDGET" "$before")
   run_then_status "${PR_NODES[1]}" "In Review" "$FIRST_CARD_BUDGET" "$before" > /dev/null
-  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 5 review-requested)" "pull_request_target/review_requested" "${ISSUE_NODES[0]}" "In Progress" "In Review" "$url" "$started" "$elapsed"
   echo "check 5 ok: In Review in ${elapsed}s"
 }
@@ -270,11 +270,11 @@ check5_review_requested() {
 # check6: changes requested on PR B (synthetic dispatch), expect In Progress
 check6_changes_requested() {
   local before url started elapsed
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   dispatch "pull_request_review" "submitted" "${PR_NUMBERS[1]}" "${PR_NODES[1]}" "changes_requested"
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
   run_then_status "${PR_NODES[1]}" "In Progress" "$FIRST_CARD_BUDGET" "$before" > /dev/null
-  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 6 changes-requested)" "pull_request_review/submitted" "${ISSUE_NODES[0]}" "In Review" "In Progress" "$url" "$started" "$elapsed"
   echo "check 6 ok: In Progress in ${elapsed}s"
 }
@@ -282,7 +282,7 @@ check6_changes_requested() {
 # check7: an approved review must leave the Status unchanged
 check7_approved_noop() {
   local before_run before_status after_status url started
-  before_run=$(newest_run_id)
+  before_run=$(newest_run_id "Board sync")
   before_status=$(card_status "${ISSUE_NODES[0]}")
   dispatch "pull_request_review" "submitted" "${PR_NUMBERS[1]}" "${PR_NODES[1]}" "approved"
   run_then_status "${ISSUE_NODES[0]}" "$before_status" "$FIRST_CARD_BUDGET" "$before_run" > /dev/null
@@ -291,7 +291,7 @@ check7_approved_noop() {
     echo "approved review moved the card: $before_status -> $after_status" >&2
     return 1
   }
-  read -r url started <<< "$(await_new_run "$before_run" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before_run" 1)"
   evidence "$(evfile 7 approved-noop)" "pull_request_review/submitted (approved)" "${ISSUE_NODES[0]}" "$before_status" "$after_status" "$url" "$started" "0"
   echo "check 7 ok: approved review was a no-op"
 }
@@ -300,10 +300,10 @@ check7_approved_noop() {
 # expect the issue back to Todo
 check8_close_unmerged() {
   local before url started elapsed
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   gh pr close "${PR_NUMBERS[1]}" --repo "$REPO"
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "Todo" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 8 close-unmerged)" "pull_request_target/closed" "${ISSUE_NODES[0]}" "In Progress" "Todo" "$url" "$started" "$elapsed"
   echo "check 8 ok: Todo in ${elapsed}s"
 }
@@ -312,11 +312,11 @@ check8_close_unmerged() {
 # expect the issue closed and the card Done via the native Item closed workflow
 check9_merge_done() {
   local before url started elapsed_e
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   gh pr reopen "${PR_NUMBERS[1]}" --repo "$REPO"
   elapsed_e=$(run_then_status "${ISSUE_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
   run_then_status "${PR_NODES[1]}" "In Progress" "$FIRST_CARD_BUDGET" "$before" > /dev/null
-  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 9 reopen-pr)" "pull_request_target/reopened" "${ISSUE_NODES[0]}" "Todo" "In Progress" "$url" "$started" "$elapsed_e"
   evidence "$(evfile 9b reopen-pr-prcard)" "pull_request_target/reopened" "${PR_NODES[1]}" "Todo" "In Progress" "$url" "$started" "$elapsed_e"
 
@@ -364,7 +364,7 @@ nightly_test() {
 
   # reopen A through the real state row so its card is Todo, then blank it:
   # the nightly fills blanks with the default and never infers history
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   dispatch "issues" "reopened" "$num_a" "$node_a"
   run_then_status "$node_a" "Todo" "$FIRST_CARD_BUDGET" "$before" > /dev/null
 
@@ -502,12 +502,13 @@ main() {
       : "${E2E_TOKEN:?E2E_TOKEN is required}" "${E2E_OWNER:?E2E_OWNER is required}" \
         "${E2E_REPOS:?E2E_REPOS is required}" "${E2E_TOKEN_EXPIRY:?E2E_TOKEN_EXPIRY is required}"
       provision ;;
-    checks|nightly|reset)
+    checks|nightly|reset|all)
       : "${E2E_REPO:?E2E_REPO is required}" "${E2E_PROJECT_ID:?E2E_PROJECT_ID is required}"
       case "$cmd" in
         checks) checks ;;
-        nightly) nightly_test ;;
+        nightly) require_tracked; nightly_test ;;
         reset) reset_board ;;
+        all) checks; nightly_test; reset_board ;;
       esac ;;
   esac
 }
