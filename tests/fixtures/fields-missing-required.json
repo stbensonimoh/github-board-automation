@@ -5,7 +5,7 @@
         "nodes": [
           {
             "__typename": "ProjectV2Field",
-            "id": "PVTF_lADOtitle0000000",
+            "id": "PVTF_title000000000",
             "name": "Title"
           },
           {
@@ -14,33 +14,21 @@
             "name": "Status",
             "options": [
               {
-                "id": "0a6e581e",
+                "id": "id_backlog",
                 "name": "Backlog",
                 "color": "GRAY",
                 "description": ""
               },
               {
-                "id": "f75ad846",
+                "id": "id_todo",
                 "name": "Todo",
-                "color": "GREEN",
+                "color": "GRAY",
                 "description": ""
               },
               {
-                "id": "47fc9ee4",
-                "name": "In Progress",
-                "color": "YELLOW",
-                "description": ""
-              },
-              {
-                "id": "f4b3cd98",
-                "name": "In Review",
-                "color": "PURPLE",
-                "description": ""
-              },
-              {
-                "id": "98236657",
+                "id": "id_done",
                 "name": "Done",
-                "color": "BLUE",
+                "color": "GRAY",
                 "description": ""
               }
             ]
