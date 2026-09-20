@@ -111,6 +111,19 @@ The board is a state machine:
 Backlog to Todo triage stays manual. `Closes #N` style keywords link PRs to
 issues, same repo only, case insensitive.
 
+## Questions people ask
+
+- **Does this run once, or for every project?** Once per project board. Each
+  board needs its own run of the command.
+- **Several repos, one board?** Yes. Orgs list them all in one command.
+  Personal accounts: run the command again with the same project number and
+  the next repo.
+- **Do I clone this tool again for a new project?** No. Open the folder you
+  cloned (`cd github-board-automation`) and run the command again with the new
+  project number.
+- **Want to stop using it on a repo?** Remove the `board-sync.yml` file from
+  the repo and delete the two secrets. Both guides cover this at the bottom.
+
 ## Development
 
 `bats` installs locally with `brew install bats-core`; the two lint gates run
@@ -125,3 +138,9 @@ bats tests/
 Images are pinned by digest so local runs match CI exactly. CI runs the same
 three checks on every PR. `SPEC.md` is the full spec; docs/ carries the
 install guides and troubleshooting.
+
+## More detail
+
+- docs/install-org.md: the org walkthrough
+- docs/install-individual.md: the personal walkthrough, both install styles
+- docs/troubleshooting.md: what to do when something fails
