@@ -117,10 +117,10 @@ mock_gh_board() {
     [[ "$mutation" == *"$name"* ]] || { echo "mutation missing option: $name"; return 1; }
   done
   for id in id_todo id_inprogress id_done; do
-    [[ "$mutation" == *"$id"* ]] || { echo "mutation dropped existing option id: $id"; return 1; }
+    [[ "$mutation" == *"id: \"$id\""* ]] || { echo "mutation dropped existing option id: $id"; return 1; }
   done
   [[ "$mutation" == *'ready to start'* ]] || { echo "description lost"; return 1; }
-  [[ "$mutation" == *'"color":"GREEN"'* ]] || { echo "color lost"; return 1; }
+  [[ "$mutation" == *'color: "GREEN"'* ]] || { echo "color lost"; return 1; }
   # the field id is an inline literal
   [[ "$mutation" == *'fieldId: "PVTSSF_lADOstatus00000"'* ]]
 }
