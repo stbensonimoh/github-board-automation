@@ -15,7 +15,7 @@ Current state (source of truth in local `board-automation/` folder, built 2026-0
 
 Scope note: the local `board-automation/` folder is reference v0. It is not REQUIRED to conform to this SPEC. Conformance applies to new code built in this repo from the task list onward.
 
-State machine to preserve. Implementations MUST implement all rows. The close keyword set is fixed and normative: `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each preceded by a leading boundary and followed by one or more whitespace characters then `#[0-9]+`, case insensitive, same repo only:
+State machine to preserve. Implementations MUST implement all rows. The close keyword set is fixed and normative: `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each preceded by a leading boundary and followed by an optional colon then one or more whitespace characters then `#[0-9]+`, case insensitive, same repo only:
 
 | Event | Result |
 | --- | --- |
@@ -110,7 +110,7 @@ scripts/
   board-lib.sh                   -> shared helpers: paginated items query, add item, set Status; sourced by both sync and nightly paths
 tests/
   setup.bats                     -> setup script unit tests
-  parse.bats                     -> close keyword parser unit tests sourcing scripts/parse-linked.sh with PR body fixtures
+  parse.bats                     -> close keyword parser unit tests calling scripts/parse-linked.sh with PR body fixtures
   fixtures/                      -> sample GraphQL responses for Status field and options
 docs/
   install-org.md                 -> org path with org secrets
@@ -147,7 +147,7 @@ Conventions:
 * `workflow_call` inputs MUST use snake case (`event_name`, `review_state`)
 * Env names MUST use upper snake case (`BOARD`, `REPO`, `NUMBER`)
 * GraphQL mutations MUST use inline literals for ids and MUST keep `-f` variables for user supplied values only. This avoids the known `Type mismatch on variable $o` failure.
-* The close keyword matcher MUST be case insensitive over the exact set `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each preceded by a leading boundary `(^|[^[:alnum:]_])` and followed by `#[0-9]+` for containment: `grep -oEi '(^|[^[:alnum:]_])(closes?|closed|fix(es|ed)?|resolves?|resolved)[[:space:]]+#[0-9]+'`. The trailing terminator is intentionally omitted because `[0-9]+` is greedy and consuming the separator drops a second reference on the same line. For extraction the parser MUST then recover digits only, for example piping through `grep -oE '[0-9]+'`.
+* The close keyword matcher MUST be case insensitive over the exact set `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each preceded by a leading boundary `(^|[^[:alnum:]_])` and followed by an optional colon `:?` (GitHub documents the `Closes: #10` form) then one or more whitespace characters then `#[0-9]+` for containment: `LC_ALL=C.UTF-8 grep -oEi '(^|[^[:alnum:]_])(closes?|closed|fix(es|ed)?|resolves?|resolved):?[[:space:]]+#[0-9]+'`. The locale is pinned so the non ASCII boundary behaves identically everywhere. The trailing terminator is intentionally omitted because `[0-9]+` is greedy and consuming the separator drops a second reference on the same line. For extraction the parser MUST then recover digits only, for example piping through `grep -oE '[0-9]+'`.
 * The keyword parser MUST live in `scripts/parse-linked.sh`, MUST take the PR body as an input argument or stdin, and MUST perform zero network calls so it is unit testable. Both the reusable workflow and `tests/parse.bats` MUST call that file. Workflows MAY fetch these trusted helper scripts from the platform repo at the immutable `v1.x.y` tag or commit SHA without checking out the triggering repo. Workflows MUST NOT check out the triggering repo code; they SHALL only call the API with event data. Checking out the trusted platform repo at an immutable tag for helpers only is allowed because it never executes untrusted PR code.
 * Pull request activity including review requests MUST use `pull_request_target` for fork safety with explicit types `types: [opened, reopened, closed, review_requested]`. Submitted reviews MUST use `pull_request_review` with `types: [submitted]` because that event only fires there. Issue events MUST declare `issues: types: [opened, reopened]`. No path MUST check out the PR head or any untrusted ref; paths SHALL only call the API with event data. The exceptions are fetching trusted helper scripts from the platform repo at an immutable tag, and mode A reading its local helper scripts from the caller repo base branch only.
 * Both the sync workflow and the nightly workflow MUST use one shared concurrency group per repo: `board-${{ github.repository }}` with `cancel-in-progress: false`. The `repository` value MUST come from the `github` context. GitHub serializes the two workflows on the same repo through this shared group. Nightly MUST additionally re-read each item's Status immediately before writing, MUST write only when the item is missing or still blank, and MUST NOT touch any item that already has a Status value.
@@ -157,7 +157,7 @@ Conventions:
 The strategy is lint plus script tests plus live E2E on a test board. The following are REQUIRED:
 
 * `shellcheck` on all shell, `actionlint` on all workflows, and `bats` on `setup.sh` option parsing, id resolution, and dry run output MUST all pass before a PR is opened.
-* Fixture tests for keyword parsing MUST verify every form in the normative set: `close #1`, `closes #12`, `closed #13`, `fix #2`, `fixes #3`, `fixed #4`, `resolve #5`, `resolves #44`, `Resolved #45`, plus case variants such as `CLOSES #6`, plus multiple references on one line such as `closes #1 fixes #2 resolves #3` yielding `1 2 3`. Bare `#7` MUST NOT match. `closes#1` MUST NOT match. `closes owner/repo#9` MUST NOT match. `fixes owner/repo#9 #12` MUST match only `#12`. `closing #10` MUST NOT match. `prefix #7` MUST NOT match. `unfixed #4` MUST NOT match.
+* Fixture tests for keyword parsing MUST verify every form in the normative set: `close #1`, `closes #12`, `closed #13`, `fix #2`, `fixes #3`, `fixed #4`, `resolve #5`, `resolves #44`, `Resolved #45`, plus case variants such as `CLOSES #6` and the GitHub documented colon forms such as `Fixes: #12`, plus multiple references on one line such as `closes #1 fixes #2 resolves #3` yielding one number per line in order. Bare `#7` MUST NOT match. `closes#1` MUST NOT match. `closes owner/repo#9` MUST NOT match. `fixes owner/repo#9 #12` MUST NOT match: the keyword is consumed by the cross repo ref, and the trailing bare `#12` is a mention, not a close ref. `closing #10` MUST NOT match. `prefix #7` MUST NOT match. `unfixed #4` MUST NOT match. No match cases MUST exit zero so a body without close refs never fails the workflow step.
 * Live E2E on a throwaway board and repo MUST verify these eight checks in order, mirroring the old README first run test:
   1. Open test issue, expect Backlog within 90 seconds
   2. Reopen a closed test issue, expect Todo

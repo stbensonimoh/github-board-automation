@@ -11,4 +11,4 @@ docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint@sha256:b1934ee5f1c5096
 bats tests/
 ```
 
-Images are pinned by digest so local runs match CI exactly. The first command exits 3 with a "No files specified." usage message while the scaffold has no shell files; that is expected until #4 lands. CI runs the same three checks on every PR. See `SPEC.md` for the full spec.
+Images are pinned by digest so local runs match CI exactly. The shellcheck and actionlint gates exit non zero on any violation, and `bats tests/` prints a line per test. See `SPEC.md` for the full spec.
