@@ -329,6 +329,43 @@ mock_gh_seq() {
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
 }
 
+@test "jsonl pr pagination terminates when hasNextPage is true but endCursor is null" {
+  load_lib
+  fetch_open_prs_page() { cat "$FIXTURES/prs-nullcursor.json"; }
+  out="$(fetch_all_open_prs_jsonl octo-org/api)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
+}
+
+@test "jsonl pr pagination terminates when the API repeats the same cursor" {
+  load_lib
+  bounded() { printf 'x\n' >> "$BATS_TEST_TMPDIR/jsonlfetches"; [ "$(wc -l < "$BATS_TEST_TMPDIR/jsonlfetches")" -le 3 ] || return 1; cat "$FIXTURES/prs-repeatcursor.json"; }
+  fetch_open_prs_page() { bounded; }
+  out="$(fetch_all_open_prs_jsonl octo-org/api)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
+}
+
+# --- PR bodies for the sync path close ref check ------------------------------
+
+@test "prs_extract_jsonl emits one compact json object per open PR" {
+  load_lib
+  out="$(prs_extract_jsonl < "$FIXTURES/prs-bodies-page1.json")"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
+  first="$(printf '%s' "$out" | head -1)"
+  [ "$(jq -r .number <<<"$first")" = "4" ]
+  [ "$(jq -r .body <<<"$first")" = "Fixes: #12 and closes #13" ]
+  [ "$(jq -r '.body' <<<"$(printf '%s' "$out" | sed -n 2p)")" = "" ]
+}
+
+@test "fetch_all_open_prs_jsonl follows the cursor across pages" {
+  load_lib
+  fetch_open_prs_page() {
+    if [ -z "$2" ]; then cat "$FIXTURES/prs-bodies-page1.json"; else cat "$FIXTURES/prs-bodies-page2.json"; fi
+  }
+  out="$(fetch_all_open_prs_jsonl octo-org/api)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "3" ]
+  [ "$(jq -r .number <<<"$(printf '%s' "$out" | tail -1)")" = "6" ]
+}
+
 @test "the helper defines no status transitions" {
   run ! grep -qE 'issues/(opened|reopened)|pull_request_target/|pull_request_review' "$LIB"
   run ! grep -nE 'Backlog|Todo|In Progress|In Review|Done|review_requested|changes_requested' "$LIB"

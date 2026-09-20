@@ -174,7 +174,7 @@ fetch_open_prs_page() {
     query($owner: String!, $name: String!, $cursor: String) {
       repository(owner: $owner, name: $name) {
         pullRequests(first: 100, after: $cursor, states: OPEN) {
-          nodes { id number state }
+          nodes { id number state body }
           pageInfo { hasNextPage endCursor }
         }
       }
@@ -187,6 +187,12 @@ issues_extract() {
 
 prs_extract() {
   jq -r '.data.repository.pullRequests.nodes[].id'
+}
+
+# One compact JSON object per open PR: {number, body}. The sync path pipes
+# each body through scripts/parse-linked.sh for the close ref check.
+prs_extract_jsonl() {
+  jq -c '.data.repository.pullRequests.nodes[] | {number: .number, body: (.body // "")}'
 }
 
 fetch_all_open_issues() {
@@ -207,6 +213,19 @@ fetch_all_open_prs() {
   while :; do
     page=$(fetch_open_prs_page "$slug" "$cursor")
     printf '%s' "$page" | prs_extract
+    [ "$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.hasNextPage')" = "true" ] || break
+    next=$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.endCursor // empty')
+    [ -n "$next" ] || break
+    [ "$next" != "$cursor" ] || break
+    cursor=$next
+  done
+}
+
+fetch_all_open_prs_jsonl() {
+  local slug="$1" cursor="" next page
+  while :; do
+    page=$(fetch_open_prs_page "$slug" "$cursor")
+    printf '%s' "$page" | prs_extract_jsonl
     [ "$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.hasNextPage')" = "true" ] || break
     next=$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.endCursor // empty')
     [ -n "$next" ] || break
