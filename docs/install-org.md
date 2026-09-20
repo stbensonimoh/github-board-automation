@@ -12,9 +12,10 @@ per repo secret work.
    - Resource owner: your org
    - Organization permissions: Projects, Secrets, and Variables, all read and
      write (setup places the org secrets and the repo list variable)
-   - Repository access: every participating repo with Contents, Workflows,
-     Secrets, Variables, and Pull requests, all read and write (setup pushes
-     the caller files)
+   - Repository access: every participating repo with Contents, Issues,
+     Workflows, Secrets, Variables, and Pull requests, all read and write
+     (the placed token reads issues and PRs at runtime; setup pushes the
+     caller files)
    - An expiry date you will actually remember
 3. The ProjectV2 board created in the org with the Status field showing at
    least the default `Todo`, `In Progress`, `Done`.
@@ -45,8 +46,9 @@ The PAT is read from stdin and never echoed.
 ## After setup
 
 Setup commits the caller files directly. If your default branch rejects direct
-commits, add the caller files through a pull request yourself, then run the
-walkthrough test:
+commits, add the files setup would have written through a pull request
+yourself: from `templates/` in your clone, `board-sync.yml` in every repo and
+`board-nightly-sync.yml` in the first repo. Then run the walkthrough test:
 
 1. Open a test issue in one repo: it lands on the board as Backlog
 2. Open a PR whose body says `Closes #N` for that issue: the PR and the issue
