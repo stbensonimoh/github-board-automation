@@ -41,7 +41,7 @@ while [ $# -gt 0 ]; do
       shift
       [ $# -gt 0 ] || { echo "--repos needs at least one OWNER/REPO slug" >&2; exit 1; }
       while [ $# -gt 0 ] && [[ ! "$1" == --* ]]; do
-        if [[ "$1" =~ ^[^/]+/[^/]+$ ]]; then
+        if [[ "$1" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
           REPOS="${REPOS:+$REPOS }$1"
         else
           echo "rejecting '$1': repos must be fully qualified OWNER/REPO slugs" >&2
