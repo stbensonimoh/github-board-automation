@@ -10,8 +10,13 @@ NIGHTLY="$BATS_TEST_DIRNAME/../templates/board-nightly-sync.yml"
 @test "templates stay out of the live workflows directory" {
   # GitHub runs every YAML in .github/workflows; a template there fires on
   # real events and fails on the not yet existing v1 tag
-  [ ! -e "$BATS_TEST_DIRNAME/../.github/workflows/board-sync.yml" ]
-  [ ! -e "$BATS_TEST_DIRNAME/../.github/workflows/board-nightly-sync.yml" ]
+  for t in "$BATS_TEST_DIRNAME"/../templates/*.yml; do
+    base=$(basename "$t")
+    [ ! -e "$BATS_TEST_DIRNAME/../.github/workflows/$base" ] || {
+      echo "template leaked into live workflows: $base"
+      return 1
+    }
+  done
 }
 
 @test "caller is at most 40 lines" {
