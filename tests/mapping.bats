@@ -93,3 +93,46 @@ run_mapping() {
   [ "$(printf '%s' "$output" | sed -n 4p)" = "opt:In Progress" ]
   [ "$(printf '%s' "$output" | sed -n 5p)" = "opt:In Review" ]
 }
+
+extract_revert() {
+  sed -n '/^          revert_linked_issues_to_todo() {$/,/^          }$/p' "$YML"
+}
+
+@test "revert skips linked issues that are already closed" {
+  {
+    echo 'set -euo pipefail'
+    echo 'REPO=octo-org/api'
+    echo 'NUMBER=7'
+    echo 'T=T'
+    echo 'PARSER=scripts/parse-linked.sh'
+    echo 'linked_issue_numbers() { printf "12\n"; }'
+    echo 'fetch_all_open_prs_jsonl() { echo ""; }'
+    # issue 12 is already closed; gh is called once per linked issue
+    echo 'gh() { printf "%s" "{\"state\": \"closed\", \"node_id\": \"NODE_X\"}"; }'
+    echo 'set_item_status() { echo "MOVED:$1"; }'
+    sed -n '/^          revert_linked_issues_to_todo() {$/,/^          }$/p' "$YML"
+  echo 'revert_linked_issues_to_todo'
+  } > "$BATS_TEST_TMPDIR/revert.sh"
+  run bash "$BATS_TEST_TMPDIR/revert.sh"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "revert moves open linked issues to Todo" {
+  {
+    echo 'set -euo pipefail'
+    echo 'REPO=octo-org/api'
+    echo 'NUMBER=7'
+    echo 'T=T'
+    echo 'PARSER=scripts/parse-linked.sh'
+    echo 'linked_issue_numbers() { printf "12\n"; }'
+    echo 'fetch_all_open_prs_jsonl() { echo ""; }'
+    echo 'gh() { printf "%s" "{\"state\": \"open\", \"node_id\": \"NODE_OPEN\"}"; }'
+    echo 'set_item_status() { echo "MOVED:$1"; }'
+    sed -n '/^          revert_linked_issues_to_todo() {$/,/^          }$/p' "$YML"
+  echo 'revert_linked_issues_to_todo'
+  } > "$BATS_TEST_TMPDIR/revert-open.sh"
+  run bash "$BATS_TEST_TMPDIR/revert-open.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = "MOVED:NODE_OPEN" ]
+}
