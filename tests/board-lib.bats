@@ -194,9 +194,22 @@ mock_gh_seq() {
   lines="$(items_extract < "$FIXTURES/items-page1.json")"
   fields="$(cat "$FIXTURES/fields.json")"
   mock_gh_read_fails '{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_newItem000000"}}}}'
-  run write_if_blank PVT_board0000000 "$fields" "$lines" PR_pullNode0000001 47fc9ee4
+  run --separate-stderr write_if_blank PVT_board0000000 "$fields" "$lines" PR_pullNode0000001 47fc9ee4
   [ "$status" -ne 0 ]
+  [[ "$stderr" == *"PVTI_itemTwo000000"* ]]
   run ! grep -qE 'addProjectV2ItemById|updateProjectV2ItemFieldValue' "$MOCKLOG"
+}
+
+@test "write_if_blank aborts when the add branch status read fails" {
+  load_lib
+  lines="$(items_extract < "$FIXTURES/items-page1.json")"
+  fields="$(cat "$FIXTURES/fields.json")"
+  mock_gh_read_fails '{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_newItem000000"}}}}'
+  run --separate-stderr write_if_blank PVT_board0000000 "$fields" "$lines" I_brandNewNode0001 0a6e581e
+  [ "$status" -ne 0 ]
+  grep -q 'addProjectV2ItemById' "$MOCKLOG"
+  grep -q 'item=PVTI_newItem000000' "$MOCKLOG"
+  run ! grep -q 'updateProjectV2ItemFieldValue' "$MOCKLOG"
 }
 
 @test "write_if_blank re-reads the live status and skips a status set after the snapshot" {
@@ -279,6 +292,27 @@ mock_gh_seq() {
 @test "prs pagination terminates when hasNextPage is true but endCursor is null" {
   load_lib
   fetch_open_prs_page() { cat "$FIXTURES/prs-nullcursor.json"; }
+  out="$(fetch_all_open_prs octo-org/api)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
+}
+
+@test "items pagination terminates when the API repeats the same cursor" {
+  load_lib
+  fetch_items_page() { cat "$FIXTURES/items-repeatcursor.json"; }
+  out="$(fetch_all_items PVT_board0000000)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
+}
+
+@test "issues pagination terminates when the API repeats the same cursor" {
+  load_lib
+  fetch_open_issues_page() { cat "$FIXTURES/issues-repeatcursor.json"; }
+  out="$(fetch_all_open_issues octo-org/api)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
+}
+
+@test "prs pagination terminates when the API repeats the same cursor" {
+  load_lib
+  fetch_open_prs_page() { cat "$FIXTURES/prs-repeatcursor.json"; }
   out="$(fetch_all_open_prs octo-org/api)"
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
 }

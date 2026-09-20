@@ -1,0 +1,12 @@
+{
+  "data": {
+    "repository": {
+      "issues": {
+        "nodes": [
+          { "id": "issues_node_0000001", "number": 1, "state": "OPEN" }
+        ],
+        "pageInfo": { "hasNextPage": true, "endCursor": "SAME_CURSOR" }
+      }
+    }
+  }
+}

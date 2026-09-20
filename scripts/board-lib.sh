@@ -74,14 +74,20 @@ items_extract() {
 }
 
 # Follows endCursor until hasNextPage is false; emits items_extract rows.
+# All three list loops share one termination contract: stop when the page has
+# no next, when the next cursor is empty, or when the next cursor equals the
+# one just sent (a non advancing API). A repeated cursor costs one duplicate
+# fetch; every downstream write is conditional, so that is harmless.
 fetch_all_items() {
-  local board="$1" cursor="" page
+  local board="$1" cursor="" next page
   while :; do
     page=$(fetch_items_page "$board" "$cursor")
     printf '%s' "$page" | items_extract
     [ "$(printf '%s' "$page" | jq -r '.data.node.items.pageInfo.hasNextPage')" = "true" ] || break
-    cursor=$(printf '%s' "$page" | jq -r '.data.node.items.pageInfo.endCursor // empty')
-    [ -n "$cursor" ] || break
+    next=$(printf '%s' "$page" | jq -r '.data.node.items.pageInfo.endCursor // empty')
+    [ -n "$next" ] || break
+    [ "$next" != "$cursor" ] || break
+    cursor=$next
   done
 }
 
@@ -184,23 +190,27 @@ prs_extract() {
 }
 
 fetch_all_open_issues() {
-  local slug="$1" cursor="" page
+  local slug="$1" cursor="" next page
   while :; do
     page=$(fetch_open_issues_page "$slug" "$cursor")
     printf '%s' "$page" | issues_extract
     [ "$(printf '%s' "$page" | jq -r '.data.repository.issues.pageInfo.hasNextPage')" = "true" ] || break
-    cursor=$(printf '%s' "$page" | jq -r '.data.repository.issues.pageInfo.endCursor // empty')
-    [ -n "$cursor" ] || break
+    next=$(printf '%s' "$page" | jq -r '.data.repository.issues.pageInfo.endCursor // empty')
+    [ -n "$next" ] || break
+    [ "$next" != "$cursor" ] || break
+    cursor=$next
   done
 }
 
 fetch_all_open_prs() {
-  local slug="$1" cursor="" page
+  local slug="$1" cursor="" next page
   while :; do
     page=$(fetch_open_prs_page "$slug" "$cursor")
     printf '%s' "$page" | prs_extract
     [ "$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.hasNextPage')" = "true" ] || break
-    cursor=$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.endCursor // empty')
-    [ -n "$cursor" ] || break
+    next=$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.endCursor // empty')
+    [ -n "$next" ] || break
+    [ "$next" != "$cursor" ] || break
+    cursor=$next
   done
 }
