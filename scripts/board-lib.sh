@@ -107,6 +107,17 @@ set_status() {
   gh api graphql -f query="mutation { updateProjectV2ItemFieldValue(input: { projectId: \"$1\", itemId: \"$2\", fieldId: \"$3\", value: { singleSelectOptionId: \"$4\" } }) { projectV2Item { id } } }" > /dev/null
 }
 
+# Used by the e2e reset phase to remove test items from the board.
+delete_item() {
+  gh api graphql -f query="mutation { deleteProjectV2ItemById(input: { projectId: \"$1\", itemId: \"$2\" }) { deletedItemId } }" > /dev/null
+}
+
+# Blank a Status (singleSelectOptionId: null). Used by the e2e nightly test
+# to simulate the blank statuses the backfill exists to fill.
+clear_status() {
+  gh api graphql -f query="mutation { updateProjectV2ItemFieldValue(input: { projectId: \"$1\", itemId: \"$2\", fieldId: \"$3\", value: { singleSelectOptionId: null } }) { projectV2Item { id } } }" > /dev/null
+}
+
 fetch_item_status() {
   gh api graphql -f query='
     query($item: ID!) {
