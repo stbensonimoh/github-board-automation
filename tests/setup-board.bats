@@ -132,6 +132,9 @@ mock_gh_board() {
   run bash "$SETUP" --owner some-user --project-number 1 --repos bare-repo --dry-run
   [ "$status" -ne 0 ]
   [[ "$output" == *"bare-repo"* ]]
+  run bash "$SETUP" --owner some-user --project-number 1 --repos owner/repo/extra --dry-run
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"owner/repo/extra"* ]]
 }
 
 @test "a null board id fails fast naming the owner and number" {
