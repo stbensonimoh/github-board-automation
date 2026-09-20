@@ -72,10 +72,12 @@ mock_gh_full() {
         out=''
         ;;
       *"orgs/"*)
-        out=$(cat "$FIXTURES/org-plan-${ORG_PLAN:-free}.json")
+        if [ "${ORG_PLAN:-free}" = "not-read" ]; then out='{"message":"Not Found"}'
+        else out=$(cat "$FIXTURES/org-plan-${ORG_PLAN:-free}.json"); fi
         ;;
       *"repos/"*)
-        out=$(cat "$FIXTURES/${REPO_VISIBILITY:-repo-private}.json")
+        if [ "${FOREIGN_OWNER:-0}" = "1" ]; then out='{"private": false, "owner": {"login": "someone-else"}}'
+        else out=$(cat "$FIXTURES/${REPO_VISIBILITY:-repo-private}.json"); fi
         ;;
       *"workflows"*)
         out=$(cat "$FIXTURES/$WF_FIXTURE")
@@ -245,6 +247,23 @@ run_setup() {
   [ "$status" -eq 0 ]
   grep -q 'secret set PROJECT_AUTOMATION_TOKEN --org org-owner --visibility all' "$MOCKLOG"
   run ! grep -q -- '--repo org-owner/api' "$MOCKLOG"
+}
+
+@test "unreadable plan and foreign owner fall back to repo scope" {
+  mock_gh_full
+  export ORG_PLAN="not-read"  # the mock has no such fixture: the lookup 404s
+  run_setup --owner org-owner --project-number 1 --repos "org-owner/api" --token-expiry 2027-03-01
+  [ "$status" -eq 0 ]
+  grep -q 'secret set PROJECT_AUTOMATION_TOKEN --repo org-owner/api' "$MOCKLOG"
+  grep -q 'cannot read the org plan' "$MOCKLOG" || true
+}
+
+@test "a foreign owned repo flips the org install to repo scope" {
+  mock_gh_full
+  export ORG_PLAN="team" REPO_VISIBILITY="repo-public" FOREIGN_OWNER="1"
+  run_setup --owner org-owner --project-number 1 --repos "org-owner/api" --token-expiry 2027-03-01
+  [ "$status" -eq 0 ]
+  grep -q 'secret set PROJECT_AUTOMATION_TOKEN --repo org-owner/api' "$MOCKLOG"
 }
 
 @test "a gh auth without the workflow scope fails with the remedy" {

@@ -223,7 +223,14 @@ decide_secret_scope() {
     echo "cannot read the org plan; placing secrets at repo scope to be safe" >&2
     echo "repo"; return 0
   }
-  [ "$plan" = "free" ] || { echo "org"; return 0; }
+  case "$plan" in
+    # an org the token cannot read returns an empty plan with exit 0; treat
+    # it as unknown and fall safe to repo scope
+    null | "") echo "cannot read the org plan; placing secrets at repo scope to be safe" >&2
+      echo "repo"; return 0 ;;
+  esac
+  # the loop runs for every readable plan: the ownership flip applies to all
+  # of them, the private flip only to free
   for slug in $REPOS; do
     row=$(gh api "repos/$slug" --jq '"\(if .private then "private" else "public" end) \(.owner.login)"' 2>/dev/null) || {
       echo "cannot read the visibility of $slug; placing secrets at repo scope to be safe" >&2
@@ -231,9 +238,12 @@ decide_secret_scope() {
     }
     private_found="${row%% *}"
     owner_login="${row##* }"
-    # org secrets only reach repos inside the org, and only public ones on
-    # the free plan; anything else flips to repo scope
-    if [ "$owner_login" != "$OWNER" ] || [ "$private_found" = "private" ]; then
+    # a foreign repo is unreachable by this org's secrets on any plan
+    if [ "$owner_login" != "$OWNER" ]; then
+      echo "repo"; return 0
+    fi
+    # a private repo on the free plan cannot read org secrets
+    if [ "$plan" = "free" ] && [ "$private_found" = "private" ]; then
       echo "repo"; return 0
     fi
   done
