@@ -1,0 +1,10 @@
+{
+  "trigger_event": "issues/opened",
+  "item_node_id": "I_kwDOUijd-M8AAAABSP1QAA",
+  "status_before": "",
+  "status_after": "Backlog",
+  "run_url": "https://github.com/stbensonimoh/e2e-board-private/actions/runs/35527704563",
+  "first_step_started_at": "2026-09-20T18:01:20Z",
+  "card_visible_at": "2026-09-20T18:01:35Z",
+  "elapsed_seconds": 14
+}

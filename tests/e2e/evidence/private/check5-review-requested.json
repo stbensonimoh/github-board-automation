@@ -1,0 +1,10 @@
+{
+  "trigger_event": "pull_request_target/review_requested",
+  "item_node_id": "I_kwDOUijd-M8AAAABSP1QAA",
+  "status_before": "In Progress",
+  "status_after": "In Review",
+  "run_url": "https://github.com/stbensonimoh/e2e-board-private/actions/runs/35527805277",
+  "first_step_started_at": "2026-09-20T18:03:07Z",
+  "card_visible_at": "2026-09-20T18:03:28Z",
+  "elapsed_seconds": 16
+}

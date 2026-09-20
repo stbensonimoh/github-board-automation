@@ -20,6 +20,7 @@ setup() {
   # before the harness is sourced
   export E2E_REPO="o/r"
   export E2E_PROJECT_ID="PVT_test00000000"
+  export E2E_CONFIG="test"
 }
 
 load_harness() {
