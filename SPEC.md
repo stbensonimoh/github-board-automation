@@ -15,7 +15,7 @@ Current state (source of truth in local `board-automation/` folder, built 2026-0
 
 Scope note: the local `board-automation/` folder is reference v0. It is not REQUIRED to conform to this SPEC. Conformance applies to new code built in this repo from the task list onward.
 
-State machine to preserve. Implementations MUST implement all rows. The close keyword set is fixed and normative: `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each preceded by a leading boundary and followed by one or more whitespace characters then `#[0-9]+`, case insensitive, same repo only:
+State machine to preserve. Implementations MUST implement all rows. The close keyword set is fixed and normative: `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each preceded by a leading boundary and followed by an optional colon then one or more whitespace characters then `#[0-9]+`, case insensitive, same repo only:
 
 | Event | Result |
 | --- | --- |
