@@ -201,6 +201,16 @@ open_test_pr() { # ISSUE_NUMBER LABEL -> creates a branch with one commit
   printf '%s' "$num"
 }
 
+# The checks phase records the issue and PR identities; nightly and reset
+# operate on them, so they only make sense in the same process (the all phase
+# runs all three together).
+require_tracked() {
+  [ "${#PR_NODES[@]}" -gt 0 ] || {
+    echo "no tracked test objects: run the checks phase first (or use the all phase)" >&2
+    return 1
+  }
+}
+
 # --- the checks -------------------------------------------------------------------
 
 evfile() { echo "$EVIDENCE_DIR/check$1-$2.json"; }
@@ -492,11 +502,9 @@ usage() {
 main() {
   local cmd="${1:-checks}"
   case "$cmd" in
-    provision|checks|nightly|reset) ;;
+    provision|checks|nightly|reset|all) ;;
     *) usage; exit 1 ;;
   esac
-  # shellcheck disable=SC1091
-  source "$HARNESS_DIR/../../scripts/board-lib.sh"
   case "$cmd" in
     provision)
       : "${E2E_TOKEN:?E2E_TOKEN is required}" "${E2E_OWNER:?E2E_OWNER is required}" \
