@@ -21,7 +21,7 @@ set -euo pipefail
 fetch_fields() {
   gh api graphql -f query='
     query($project: ID!) {
-      node(id: $project) { ... on ProjectV2 { fields(first: 30) {
+      node(id: $project) { ... on ProjectV2 { fields(first: 50) {
         nodes {
           ... on ProjectV2Field { id name }
           ... on ProjectV2SingleSelectField { id name options { id name color } }
@@ -31,11 +31,17 @@ fetch_fields() {
 }
 
 field_id() {
-  jq -r --arg n "$1" '.data.node.fields.nodes[] | select(.name == $n) | .id' | head -1
+  local id
+  id=$(jq -r --arg n "$1" '.data.node.fields.nodes[] | select(.name == $n) | .id' | head -1)
+  [ -n "$id" ] || { printf 'field not found: %s\n' "$1" >&2; return 1; }
+  printf '%s\n' "$id"
 }
 
 opt_id() {
-  jq -r --arg n "$1" '.data.node.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == $n) | .id'
+  local id
+  id=$(jq -r --arg n "$1" '.data.node.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == $n) | .id')
+  [ -n "$id" ] || { printf 'option not found: %s\n' "$1" >&2; return 1; }
+  printf '%s\n' "$id"
 }
 
 # --- board items -------------------------------------------------------------
@@ -73,7 +79,8 @@ fetch_all_items() {
     page=$(fetch_items_page "$board" "$cursor")
     printf '%s' "$page" | items_extract
     [ "$(printf '%s' "$page" | jq -r '.data.node.items.pageInfo.hasNextPage')" = "true" ] || break
-    cursor=$(printf '%s' "$page" | jq -r '.data.node.items.pageInfo.endCursor')
+    cursor=$(printf '%s' "$page" | jq -r '.data.node.items.pageInfo.endCursor // empty')
+    [ -n "$cursor" ] || break
   done
 }
 
@@ -93,12 +100,24 @@ set_status() {
   gh api graphql -f query="mutation { updateProjectV2ItemFieldValue(input: { projectId: \"$1\", itemId: \"$2\", fieldId: \"$3\", value: { singleSelectOptionId: \"$4\" } }) { projectV2Item { id } } }" > /dev/null
 }
 
-# Nightly conditional write. Reads the item row from the caller's current
-# items data, then: missing -> add and set; present and blank -> set; present
-# with a Status -> skip, never overwrite. $1 board, $2 fields json, $3 item
-# rows from fetch_all_items, $4 content node id, $5 default option id.
+fetch_item_status() {
+  gh api graphql -f query='
+    query($item: ID!) {
+      node(id: $item) { ... on ProjectV2Item {
+        fieldValueByName(name: "Status") {
+          ... on ProjectV2ItemFieldSingleSelectValue { name }
+        }
+      } }
+    }' -f item="$1" | jq -r '.data.node.fieldValueByName.name // ""'
+}
+
+# Nightly conditional write. Missing -> add and set. Present: re-read the
+# item Status by id immediately before writing (not from the caller's
+# snapshot) and set only when still blank, skip otherwise. Never overwrite.
+# $1 board, $2 fields json, $3 item rows from fetch_all_items, $4 content
+# node id, $5 default option id.
 write_if_blank() {
-  local line item_id status field_id_opt
+  local line item_id field_id_opt
   field_id_opt=$(printf '%s' "$2" | field_id Status)
   line=$(item_line "$3" "$4")
   if [ -z "$line" ]; then
@@ -106,8 +125,7 @@ write_if_blank() {
     set_status "$1" "$item_id" "$field_id_opt" "$5"
   else
     item_id=${line%%$'\t'*}
-    status=${line##*$'\t'}
-    if [ -z "$status" ]; then
+    if [ -z "$(fetch_item_status "$item_id")" ]; then
       set_status "$1" "$item_id" "$field_id_opt" "$5"
     fi
   fi
@@ -163,7 +181,8 @@ fetch_all_open_issues() {
     page=$(fetch_open_issues_page "$slug" "$cursor")
     printf '%s' "$page" | issues_extract
     [ "$(printf '%s' "$page" | jq -r '.data.repository.issues.pageInfo.hasNextPage')" = "true" ] || break
-    cursor=$(printf '%s' "$page" | jq -r '.data.repository.issues.pageInfo.endCursor')
+    cursor=$(printf '%s' "$page" | jq -r '.data.repository.issues.pageInfo.endCursor // empty')
+    [ -n "$cursor" ] || break
   done
 }
 
@@ -173,6 +192,7 @@ fetch_all_open_prs() {
     page=$(fetch_open_prs_page "$slug" "$cursor")
     printf '%s' "$page" | prs_extract
     [ "$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.hasNextPage')" = "true" ] || break
-    cursor=$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.endCursor')
+    cursor=$(printf '%s' "$page" | jq -r '.data.repository.pullRequests.pageInfo.endCursor // empty')
+    [ -n "$cursor" ] || break
   done
 }

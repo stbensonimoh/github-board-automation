@@ -4,6 +4,8 @@
 # Structure. The lib is a mechanical helper: pagination, id resolution, add
 # item, set Status, and the nightly conditional write. Zero status transitions.
 
+bats_require_minimum_version 1.5.0
+
 LIB="$BATS_TEST_DIRNAME/../scripts/board-lib.sh"
 FIXTURES="$BATS_TEST_DIRNAME/fixtures"
 
@@ -56,12 +58,28 @@ mock_response() {
   [ "$(printf '%s' "$fields" | opt_id Done)" = "98236657" ]
 }
 
-@test "opt_id returns empty for an unknown option name" {
+@test "opt_id fails loudly for an unknown option name" {
   load_lib
-  mock_gh "$FIXTURES/fields.json"
-  local fields
-  fields="$(fetch_fields PVT_board0000000)"
-  [ -z "$(printf '%s' "$fields" | opt_id Blocked)" ]
+  opt_fail() {
+    local fields
+    fields="$(cat "$FIXTURES/fields.json")"
+    printf '%s' "$fields" | opt_id Blocked 2>/dev/null
+  }
+  run opt_fail
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "field_id fails loudly for an unknown field name" {
+  load_lib
+  field_fail() {
+    local fields
+    fields="$(cat "$FIXTURES/fields.json")"
+    printf '%s' "$fields" | field_id Assignee 2>/dev/null
+  }
+  run field_fail
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
 }
 
 # --- board items pagination ------------------------------------------------
@@ -88,7 +106,7 @@ mock_response() {
   load_lib
   mock_gh "$FIXTURES/items-page2.json"
   fetch_items_page PVT_board0000000 "" > /dev/null
-  ! grep -q 'cursor=' "$MOCKLOG"
+  run ! grep -q 'cursor=' "$MOCKLOG"
   : > "$MOCKLOG"
   fetch_items_page PVT_board0000000 "CUR1" > /dev/null
   grep -q 'cursor=CUR1' "$MOCKLOG"
@@ -124,17 +142,27 @@ mock_response() {
   fields="$(cat "$FIXTURES/fields.json")"
   mock_response '{"data":{"updateProjectV2ItemFieldValue":{"projectV2Item":{"id":"PVTI_itemTwo000000"}}}}'
   write_if_blank PVT_board0000000 "$fields" "$lines" PR_pullNode0000001 47fc9ee4
-  ! grep -q 'addProjectV2ItemById' "$MOCKLOG"
+  run ! grep -q 'addProjectV2ItemById' "$MOCKLOG"
   grep -q 'updateProjectV2ItemFieldValue' "$MOCKLOG"
 }
 
-@test "write_if_blank skips items that already have a status" {
+@test "write_if_blank skips items whose live status is set" {
   load_lib
   lines="$(items_extract < "$FIXTURES/items-page1.json")"
   fields="$(cat "$FIXTURES/fields.json")"
-  mock_response '{}'
+  mock_response '{"data":{"node":{"fieldValueByName":{"name":"Todo"}}}}'
   write_if_blank PVT_board0000000 "$fields" "$lines" I_issueNode0000001 0a6e581e
-  [ ! -s "$MOCKLOG" ]
+  run ! grep -qE 'addProjectV2ItemById|updateProjectV2ItemFieldValue' "$MOCKLOG"
+}
+
+@test "write_if_blank re-reads the live status and skips a status set after the snapshot" {
+  load_lib
+  lines="$(items_extract < "$FIXTURES/items-page1.json")"
+  fields="$(cat "$FIXTURES/fields.json")"
+  # the snapshot shows PR_pullNode0000001 blank, but the by id re-read finds a status
+  mock_response '{"data":{"node":{"fieldValueByName":{"name":"In Review"}}}}'
+  write_if_blank PVT_board0000000 "$fields" "$lines" PR_pullNode0000001 47fc9ee4
+  run ! grep -qE 'addProjectV2ItemById|updateProjectV2ItemFieldValue' "$MOCKLOG"
 }
 
 # --- mutations use inline literals -------------------------------------------
@@ -177,11 +205,21 @@ mock_response() {
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "3" ]
 }
 
-@test "fetch_all_open_prs returns one node id per open PR" {
+@test "fetch_all_open_prs follows the cursor across pages" {
   load_lib
-  mock_gh "$FIXTURES/prs-page1.json"
+  fetch_open_prs_page() {
+    if [ -z "$2" ]; then cat "$FIXTURES/prs-page1.json"; else cat "$FIXTURES/prs-page2.json"; fi
+  }
   out="$(fetch_all_open_prs octo-org/api)"
-  [ "$out" = "$(printf 'PR_pullNode0000009\nPR_pullNode0000010')" ]
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "3" ]
+  [ "$(printf '%s' "$out" | tail -1)" = "PR_pullNode0000011" ]
+}
+
+@test "pagination terminates when hasNextPage is true but endCursor is null" {
+  load_lib
+  fetch_items_page() { cat "$FIXTURES/items-nullcursor.json"; }
+  out="$(fetch_all_items PVT_board0000000)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "1" ]
 }
 
 # --- the single home rule -----------------------------------------------------
