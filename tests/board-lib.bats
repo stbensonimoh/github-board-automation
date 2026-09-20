@@ -298,21 +298,33 @@ mock_gh_seq() {
 
 @test "items pagination terminates when the API repeats the same cursor" {
   load_lib
-  fetch_items_page() { cat "$FIXTURES/items-repeatcursor.json"; }
+  { fetch_items_page() {
+      printf 'x\n' >> "$BATS_TEST_TMPDIR/fetches"
+      [ "$(wc -l < "$BATS_TEST_TMPDIR/fetches")" -le 3 ] || return 1
+      cat "$FIXTURES/items-repeatcursor.json"
+    }; }
   out="$(fetch_all_items PVT_board0000000)"
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
 }
 
 @test "issues pagination terminates when the API repeats the same cursor" {
   load_lib
-  fetch_open_issues_page() { cat "$FIXTURES/issues-repeatcursor.json"; }
+  { fetch_open_issues_page() {
+      printf 'x\n' >> "$BATS_TEST_TMPDIR/fetches"
+      [ "$(wc -l < "$BATS_TEST_TMPDIR/fetches")" -le 3 ] || return 1
+      cat "$FIXTURES/issues-repeatcursor.json"
+    }; }
   out="$(fetch_all_open_issues octo-org/api)"
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
 }
 
 @test "prs pagination terminates when the API repeats the same cursor" {
   load_lib
-  fetch_open_prs_page() { cat "$FIXTURES/prs-repeatcursor.json"; }
+  { fetch_open_prs_page() {
+      printf 'x\n' >> "$BATS_TEST_TMPDIR/fetches"
+      [ "$(wc -l < "$BATS_TEST_TMPDIR/fetches")" -le 3 ] || return 1
+      cat "$FIXTURES/prs-repeatcursor.json"
+    }; }
   out="$(fetch_all_open_prs octo-org/api)"
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
 }
