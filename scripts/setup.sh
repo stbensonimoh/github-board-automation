@@ -112,7 +112,7 @@ resolve_board_id() {
 # survive only when each existing option's id is included. Required options
 # that are missing cannot be fixed by a field edit, so that fails loud.
 ensure_status_options() {
-  local fields="$1" dry_run="$2" name id fid options_json
+  local fields="$1" dry_run="$2" name id fid options_gql
   local -a need=()
   local -a missing_required=()
   for name in Todo "In Progress" Done; do
