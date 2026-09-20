@@ -316,6 +316,22 @@ main() {
       ;;
   esac
 
+  # GitHub refuses workflow file creation without the workflow scope and
+  # answers with a bare 404; catch it here with the remedy instead. The check
+  # is about the AMBIENT gh auth (it does the writing), not the pasted token.
+  # Fine grained tokens send no scope header, so the check skips for them.
+  local scopes_header
+  scopes_header=$(gh api -i user 2>/dev/null | grep -i '^x-oauth-scopes:' | head -1 | cut -d: -f2- || true)
+  if [ -n "$scopes_header" ]; then
+    case "$scopes_header" in
+      *workflow*) ;;
+      *) echo "your gh auth lacks the workflow scope, which GitHub requires to create workflow files" >&2
+         echo "run: env -u GITHUB_TOKEN gh auth refresh -s workflow" >&2
+         echo "then unset GITHUB_TOKEN in this shell (it overrides the refreshed keyring auth)" >&2
+         exit 1 ;;
+    esac
+  fi
+
   # the runtime token travels by stdin and is never echoed or logged; cat
   # handles both a piped token (no trailing newline) and a hidden TTY paste
   if [ -t 0 ]; then

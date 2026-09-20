@@ -20,6 +20,7 @@ setup() {
 
 teardown() {
   unset -f gh 2>/dev/null
+  unset GH_SCOPES 2>/dev/null || true
 }
 
 # Full flow mock: every gh call is logged (args only, so the token on stdin
@@ -66,14 +67,25 @@ mock_gh_full() {
         fi
         ;;
     esac
+    # setup's scope pre-flight calls gh -i user; emulate the header block.
+    # GH_SCOPES defaults to a token that has the workflow scope.
+    local header_block=""
+    for a in "$@"; do
+      [ "$a" = "-i" ] && header_block="x-oauth-scopes: ${GH_SCOPES:-repo, workflow, project}\n\n"
+    done
     if [ -n "$jq_expr" ]; then
       printf '%s' "$out" | jq -r "$jq_expr"
     else
+      printf '%b' "$header_block"
       printf '%s' "$out"
     fi
   }
   export -f gh
 }
+
+# The -i pre-flight in setup.sh reads the token scope headers; the mock
+# emits them with GH_SCOPES when -i is present.
+SCOPE_HEADER_PREFIX="x-oauth-scopes:"
 
 # every live call carries the expiry; the fail fast test omits it on purpose
 run_setup() {
@@ -151,6 +163,14 @@ run_setup() {
   [ "$status" -eq 0 ]
   run ! grep -q 'secret set' "$MOCKLOG"
   run ! grep -q 'contents/' "$MOCKLOG"
+}
+
+@test "a gh auth without the workflow scope fails with the remedy" {
+  mock_gh_full
+  export GH_SCOPES="repo, project, read:org"  # no workflow scope
+  run_setup --owner some-user --project-number 1 --repos some-user/repo --individual-mode copy
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"gh auth refresh -s workflow"* ]]
 }
 
 @test "individual mode is required for user owners" {

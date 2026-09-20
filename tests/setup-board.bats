@@ -62,14 +62,25 @@ mock_gh_board() {
         fi
         ;;
     esac
+    # setup's scope pre-flight calls gh -i user; emulate the header block.
+    # GH_SCOPES defaults to a token that has the workflow scope.
+    local header_block=""
+    for a in "$@"; do
+      [ "$a" = "-i" ] && header_block="x-oauth-scopes: ${GH_SCOPES:-repo, workflow, project}\n\n"
+    done
     if [ -n "$jq_expr" ]; then
       printf '%s' "$out" | jq -r "$jq_expr"
     else
+      printf '%b' "$header_block"
       printf '%s' "$out"
     fi
   }
   export -f gh
 }
+
+# The -i pre-flight in setup.sh reads the token scope headers; the mock
+# emits them with GH_SCOPES when -i is present.
+SCOPE_HEADER_PREFIX="x-oauth-scopes:"
 
 @test "--help prints usage and exits zero" {
   run bash "$SETUP" --help
