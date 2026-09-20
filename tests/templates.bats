@@ -44,7 +44,7 @@ NIGHTLY="$BATS_TEST_DIRNAME/../templates/board-nightly-sync.yml"
 @test "caller maps every input with an explicit event fallback" {
   grep -q 'event_name: ${{ inputs.event_name || github.event_name }}' "$SYNC"
   grep -q 'action: ${{ inputs.action || github.event.action }}' "$SYNC"
-  grep -q 'number: ${{ inputs.number || github.event.issue.number || github.event.pull_request.number }}' "$SYNC"
+  grep -q 'number: ${{ inputs.number && fromJSON(inputs.number) || github.event.issue.number || github.event.pull_request.number }}' "$SYNC"
   grep -q 'node_id: ${{ inputs.node_id || github.event.issue.node_id || github.event.pull_request.node_id }}' "$SYNC"
   grep -q 'repository: ${{ github.repository }}' "$SYNC"
   grep -q 'merged: ${{ github.event.pull_request.merged == true }}' "$SYNC"
