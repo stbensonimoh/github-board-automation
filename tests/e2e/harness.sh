@@ -98,6 +98,7 @@ await_status() {
 
 evidence() {
   # evidence FILE TRIGGER_NODE BEFORE AFTER RUN_URL FIRST_STEP ELAPSED
+  mkdir -p "$(dirname "$1")"
   jq -n \
     --arg trigger_event "$2" --arg item_node_id "$3" \
     --arg status_before "$4" --arg status_after "$5" \

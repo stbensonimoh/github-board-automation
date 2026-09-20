@@ -4,6 +4,8 @@
 # UX. These tests lock the SPEC pinned contract: triggers, dispatch inputs,
 # explicit secrets, the 40 line cap, and the nightly's variable handling.
 
+bats_require_minimum_version 1.5.0
+
 SYNC="$BATS_TEST_DIRNAME/../templates/board-sync.yml"
 NIGHTLY="$BATS_TEST_DIRNAME/../templates/board-nightly-sync.yml"
 
