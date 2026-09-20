@@ -79,7 +79,43 @@ NIGHTLY="$BATS_TEST_DIRNAME/../.github/workflows/board-nightly-sync-template.yml
   grep -q 'items=\$(fetch_all_items' "$NIGHTLY"
 }
 
-@test "nightly pins the helper fetch to an immutable ref" {
+@test "both workflows use the shared repo wide concurrency group" {
+  # the reusable workflow and the nightly standalone need their own group;
+  # the thin caller delegates and inherits the reusable workflow's group
+  for f in "$NIGHTLY" "$BATS_TEST_DIRNAME/../.github/workflows/board-automation.yml"; do
+    grep -q '^concurrency:' "$f" || { echo "missing concurrency in $f"; return 1; }
+    grep -q 'group: board-\${{ github.repository }}' "$f" || { echo "wrong group in $f"; return 1; }
+  done
+}
+
+@test "nightly loop wiring pairs issues with B and PRs with P and rejects bare slugs" {
+  block=$(sed -n '/for slug in \$BOARD_REPOS/,/^          done$/p' "$NIGHTLY")
+  stub='set -euo pipefail
+fetch_all_open_issues() { echo I_1; }
+fetch_all_open_prs() { echo PR_1; }
+write_if_blank() { echo "write:$4:$5"; }'
+  run env BOARD_REPOS="o/r" BOARD=b fields=f items=i B=B P=P bash -c "$stub
+$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"write:I_1:B"* ]]
+  [[ "$output" == *"write:PR_1:P"* ]]
+  run env BOARD_REPOS=bare BOARD=b fields=f items=i B=B P=P bash -c "$stub
+$block"
+  [ "$status" -ne 0 ]
+}
+
+@test "nightly loop fails loud when an issue fetch fails" {
+  block=$(sed -n '/for slug in \$BOARD_REPOS/,/^          done$/p' "$NIGHTLY")
+  stub='set -euo pipefail
+fetch_all_open_issues() { return 1; }
+fetch_all_open_prs() { echo PR_1; }
+write_if_blank() { echo "write:$4:$5"; }'
+  run env BOARD_REPOS="o/r" BOARD=b fields=f items=i B=B P=P bash -c "$stub
+$block"
+  [ "$status" -ne 0 ]
+}
+
+@test "nightly pins the helper fetch to the same ref as the reusable workflow" {
   grep -qE 'ref: [0-9a-f]{40}' "$NIGHTLY"
   ! grep -q '@main' "$NIGHTLY"
 }

@@ -15,6 +15,12 @@ on:
 permissions:
   contents: read
 
+# Shared repo wide group (SPEC Code Style): serializes the nightly with sync
+# runs on the same repo.
+concurrency:
+  group: board-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -47,18 +53,31 @@ jobs:
           items=$(fetch_all_items "$BOARD")
 
           for slug in $BOARD_REPOS; do
-            case "$slug" in */*) ;; *) echo "rejecting bare repo name '$slug': use fully qualified owner/repo" >&2; exit 1 ;; esac
+            if [[ ! "$slug" =~ ^[^/]+/[^/]+$ ]]; then
+              echo "rejecting bare repo name '$slug': use fully qualified owner/repo" >&2
+              exit 1
+            fi
             echo "syncing $slug"
-            # open issues only: closed issues are never readded
+            # open issues only: closed issues are never readded. A failed
+            # fetch must fail the run: green with zero syncs hides exactly
+            # the outage this safety net exists for.
+            if ! issues=$(fetch_all_open_issues "$slug"); then
+              echo "failed to fetch open issues for $slug" >&2
+              exit 1
+            fi
             while IFS= read -r node; do
               [ -n "$node" ] || continue
               write_if_blank "$BOARD" "$fields" "$items" "$node" "$B"
               echo "backfilled $slug $node"
-            done < <(fetch_all_open_issues "$slug")
+            done <<< "$issues"
+            if ! prs=$(fetch_all_open_prs "$slug"); then
+              echo "failed to fetch open PRs for $slug" >&2
+              exit 1
+            fi
             while IFS= read -r node; do
               [ -n "$node" ] || continue
               write_if_blank "$BOARD" "$fields" "$items" "$node" "$P"
               echo "backfilled $slug $node"
-            done < <(fetch_all_open_prs "$slug")
+            done <<< "$prs"
           done
           echo "nightly sync complete"
