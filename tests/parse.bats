@@ -69,36 +69,69 @@ run_body() {
 
 @test "bare #7 does not match" {
   run_body 'see #7 for context'
+  [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
 @test "closes#1 without whitespace does not match" {
   run_body 'closes#1'
+  [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
 @test "closes owner/repo#9 cross repo does not match" {
   run_body 'closes owner/repo#9'
+  [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
 @test "fixes owner/repo#9 #12 cross repo consumes the keyword, nothing matches" {
   run_body 'fixes owner/repo#9 #12'
+  [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
 @test "closing #10 gerund does not match" {
   run_body 'closing #10'
+  [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
 @test "prefix #7 embedded keyword does not match" {
   run_body 'prefix #7'
+  [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
 @test "unfixed #4 embedded keyword does not match" {
   run_body 'unfixed #4'
+  [ -z "$output" ]
+}
+
+@test "Fixes: #12 colon form matches (GitHub documented form)" {
+  run_body 'Fixes: #12'
+  [ "$output" = "12" ]
+}
+
+@test "closes: #1 lowercase colon form matches" {
+  run_body 'closes: #1'
+  [ "$output" = "1" ]
+}
+
+@test "no keyword means zero exit, not an error" {
+  run_body 'just a mention of #7'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "empty body exits zero" {
+  run_body ''
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "non ascii letter before keyword is not a boundary" {
+  run_body 'éfixes #12'
   [ -z "$output" ]
 }
 
