@@ -112,7 +112,7 @@ resolve_board_id() {
 # survive only when each existing option's id is included. Required options
 # that are missing cannot be fixed by a field edit, so that fails loud.
 ensure_status_options() {
-  local fields="$1" dry_run="$2" name id fid options_json
+  local fields="$1" dry_run="$2" name id fid options_gql
   local -a need=()
   local -a missing_required=()
   for name in Todo "In Progress" Done; do
@@ -144,14 +144,18 @@ ensure_status_options() {
   # say option identity and existing item field values are only preserved
   # when the id is included. New options are submitted without ids. The ids
   # stay transient; they are never stored.
-  options_json=$(printf '%s' "$fields" | jq -c '
+  # GraphQL object literals are not JSON: keys stay unquoted and only the
+  # values are quoted strings, so each object is assembled with tojson
+  # escaping (safe for any name with quotes or backslashes).
+  options_gql=$(printf '%s' "$fields" | jq -r '
     [.data.node.fields.nodes[] | select(.name == "Status") | .options[]
-      | ({name, color: (.color // "GRAY"), description: (.description // "")}
-         + (if .id then {id} else {} end))]')
+      | (if .id then "id: \(.id | tojson), " else "" end)
+      + "name: \(.name | tojson), color: \(.color // "GRAY" | tojson), description: \(.description // "" | tojson)"]
+    | join(", ")')
   for name in "${need[@]}"; do
-    options_json=$(jq -c --arg n "$name" '. + [{name: $n, color: "GRAY", description: ""}]' <<<"$options_json")
+    options_gql="$options_gql, name: $(printf '%s' "$name" | jq -Rr .), color: \"GRAY\", description: \"\""
   done
-  gh api graphql -f query="mutation { updateProjectV2Field(input: { fieldId: \"$fid\", singleSelectOptions: $options_json }) { field { ... on ProjectV2SingleSelectField { options { id name } } } } }" \
+  gh api graphql -f query="mutation { updateProjectV2Field(input: { fieldId: \"$fid\", singleSelectOptions: [$options_gql] }) { field { ... on ProjectV2SingleSelectField { options { id name } } } } }" \
     | jq -r '.data.updateProjectV2Field.field.options | map(.name) | join(", ")' \
     | { read -r names; echo "Status options now: $names"; }
 }
