@@ -12,8 +12,9 @@
 #   supplied values only (avoids the "Type mismatch on variable $o" failure).
 # - Every list query paginates with pageInfo { hasNextPage endCursor }; the
 #   v0 first: 100 single page behavior is superseded.
-# - write_if_blank re-reads the item row from the current run's items before
-#   writing and writes only when the item is missing or its Status is blank.
+# - write_if_blank re-reads the item Status by id immediately before writing
+#   (both the present branch and the add branch) and never overwrites a live
+#   Status; the caller's item rows are only used to detect missing items.
 set -euo pipefail
 
 # --- id resolution -----------------------------------------------------------
@@ -122,7 +123,11 @@ write_if_blank() {
   line=$(item_line "$3" "$4")
   if [ -z "$line" ]; then
     item_id=$(add_item "$1" "$4")
-    set_status "$1" "$item_id" "$field_id_opt" "$5"
+    # addProjectV2ItemById returns the existing item when the content is
+    # already on the board, so the live status can be anything. Re-read.
+    if [ -z "$(fetch_item_status "$item_id")" ]; then
+      set_status "$1" "$item_id" "$field_id_opt" "$5"
+    fi
   else
     item_id=${line%%$'\t'*}
     if [ -z "$(fetch_item_status "$item_id")" ]; then

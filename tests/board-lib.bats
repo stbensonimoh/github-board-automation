@@ -37,6 +37,16 @@ mock_response() {
   mock_gh "$BATS_TEST_TMPDIR/resp.json"
 }
 
+# Mock gh that answers per query shape: $1 for add mutations, $2 for reads.
+mock_gh_seq() {
+  ADD_RESP="$1"
+  READ_RESP="$2"
+  gh() {
+    printf '%s\n' "$*" >> "$MOCKLOG"
+    if [[ "$*" == *addProjectV2ItemById* ]]; then printf '%s' "$ADD_RESP"; else printf '%s' "$READ_RESP"; fi
+  }
+}
+
 # --- id resolution ---------------------------------------------------------
 
 @test "field_id resolves the Status field id by name" {
@@ -63,11 +73,12 @@ mock_response() {
   opt_fail() {
     local fields
     fields="$(cat "$FIXTURES/fields.json")"
-    printf '%s' "$fields" | opt_id Blocked 2>/dev/null
+    printf '%s' "$fields" | opt_id Blocked
   }
-  run opt_fail
+  run --separate-stderr opt_fail
   [ "$status" -ne 0 ]
   [ -z "$output" ]
+  [[ "$stderr" == *"Blocked"* ]]
 }
 
 @test "field_id fails loudly for an unknown field name" {
@@ -75,11 +86,12 @@ mock_response() {
   field_fail() {
     local fields
     fields="$(cat "$FIXTURES/fields.json")"
-    printf '%s' "$fields" | field_id Assignee 2>/dev/null
+    printf '%s' "$fields" | field_id Assignee
   }
-  run field_fail
+  run --separate-stderr field_fail
   [ "$status" -ne 0 ]
   [ -z "$output" ]
+  [[ "$stderr" == *"Assignee"* ]]
 }
 
 # --- board items pagination ------------------------------------------------
@@ -130,10 +142,21 @@ mock_response() {
   load_lib
   lines="$(items_extract < "$FIXTURES/items-page1.json")"
   fields="$(cat "$FIXTURES/fields.json")"
-  mock_response '{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_newItem000000"}}}}'
+  mock_gh_seq '{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_newItem000000"}}}}' '{"data":{"node":{"fieldValueByName":{"name":null}}}}'
   write_if_blank PVT_board0000000 "$fields" "$lines" I_brandNewNode0001 0a6e581e
   grep -q 'addProjectV2ItemById' "$MOCKLOG"
   grep -q 'updateProjectV2ItemFieldValue' "$MOCKLOG"
+}
+
+@test "write_if_blank re-reads after add: GitHub may return an item that already has a status" {
+  load_lib
+  lines="$(items_extract < "$FIXTURES/items-page1.json")"
+  fields="$(cat "$FIXTURES/fields.json")"
+  # the item was missing from the snapshot, but add returns an item whose live status is Todo
+  mock_gh_seq '{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_existingItem00"}}}}' '{"data":{"node":{"fieldValueByName":{"name":"Todo"}}}}'
+  write_if_blank PVT_board0000000 "$fields" "$lines" I_racedInNode000001 0a6e581e
+  grep -q 'addProjectV2ItemById' "$MOCKLOG"
+  run ! grep -q 'updateProjectV2ItemFieldValue' "$MOCKLOG"
 }
 
 @test "write_if_blank fills blank statuses without adding" {
@@ -162,6 +185,7 @@ mock_response() {
   # the snapshot shows PR_pullNode0000001 blank, but the by id re-read finds a status
   mock_response '{"data":{"node":{"fieldValueByName":{"name":"In Review"}}}}'
   write_if_blank PVT_board0000000 "$fields" "$lines" PR_pullNode0000001 47fc9ee4
+  grep -q 'item=PVTI_itemTwo000000' "$MOCKLOG"
   run ! grep -qE 'addProjectV2ItemById|updateProjectV2ItemFieldValue' "$MOCKLOG"
 }
 
@@ -224,6 +248,21 @@ mock_response() {
 
 # --- the single home rule -----------------------------------------------------
 
+@test "issues pagination terminates when hasNextPage is true but endCursor is null" {
+  load_lib
+  fetch_open_issues_page() { cat "$FIXTURES/issues-nullcursor.json"; }
+  out="$(fetch_all_open_issues octo-org/api)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
+}
+
+@test "prs pagination terminates when hasNextPage is true but endCursor is null" {
+  load_lib
+  fetch_open_prs_page() { cat "$FIXTURES/prs-nullcursor.json"; }
+  out="$(fetch_all_open_prs octo-org/api)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
+}
+
 @test "the helper defines no status transitions" {
-  ! grep -qE 'issues/(opened|reopened)|pull_request_target/|pull_request_review' "$LIB"
+  run ! grep -qE 'issues/(opened|reopened)|pull_request_target/|pull_request_review' "$LIB"
+  run ! grep -nE 'Backlog|Todo|In Progress|In Review|Done|review_requested|changes_requested' "$LIB"
 }
