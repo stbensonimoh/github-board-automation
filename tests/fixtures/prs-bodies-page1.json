@@ -1,0 +1,13 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "nodes": [
+          { "id": "PR_pullNode0000009", "number": 4, "state": "OPEN", "body": "Fixes: #12 and closes #13" },
+          { "id": "PR_pullNode0000010", "number": 5, "state": "OPEN", "body": null }
+        ],
+        "pageInfo": { "hasNextPage": true, "endCursor": "BODY_CURSOR_ONE" }
+      }
+    }
+  }
+}
