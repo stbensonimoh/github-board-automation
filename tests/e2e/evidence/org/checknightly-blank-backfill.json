@@ -1,10 +1,10 @@
 {
   "trigger_event": "workflow_dispatch (nightly)",
-  "item_node_id": "I_kwDOUiyt5c8AAAABSQMF2g",
+  "item_node_id": "I_kwDOUiyt5c8AAAABSQizNg",
   "status_before": "Todo",
   "status_after": "Backlog",
-  "run_url": "https://github.com/businessity/e2e-org-api/actions/runs/35531755419",
-  "first_step_started_at": "2026-09-20T19:16:20Z",
-  "card_visible_at": "2026-09-20T19:16:46Z",
-  "elapsed_seconds": 25
+  "run_url": "https://github.com/businessity/e2e-org-api/actions/runs/35535531867",
+  "first_step_started_at": "2026-09-20T20:26:06Z",
+  "card_visible_at": "2026-09-20T20:26:31Z",
+  "elapsed_seconds": 24
 }
