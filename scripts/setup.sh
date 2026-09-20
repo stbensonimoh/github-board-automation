@@ -59,7 +59,9 @@ parse_args() {
         done ;;
       --token-expiry) TOKEN_EXPIRY="$2"; shift 2 ;;
       --individual-mode) INDIVIDUAL_MODE="$2"; shift 2 ;;
-      --secret-scope) SECRET_SCOPE="$2"; shift 2 ;;
+      --secret-scope)
+        case "$2" in org|repo) ;; *) echo "--secret-scope must be org or repo" >&2; printf '%s\n' "$USAGE" >&2; exit 1 ;; esac
+        SECRET_SCOPE="$2"; shift 2 ;;
       --platform-repo) PLATFORM_REPO="$2"; shift 2 ;;
       --dry-run) DRY_RUN=true; shift ;;
       --help|-h) printf '%s\n' "$USAGE"; exit 0 ;;
@@ -191,24 +193,49 @@ check_item_closed_workflow() {
 
 # --- part 2: placement and emit -------------------------------------------------
 
+# The install mode: org for Organization owners; user owners choose via
+# --individual-mode (copy or reference) and are limited to one repo.
+decide_install_mode() {
+  if [ "$KIND" = "Organization" ]; then echo "org"; return 0; fi
+  case "$INDIVIDUAL_MODE" in
+    copy|reference) echo "$INDIVIDUAL_MODE" ;;
+    *) echo "--individual-mode copy|reference is required for user owned boards" >&2
+       printf '%s\n' "$USAGE" >&2
+       exit 1 ;;
+  esac
+  [ "${REPOS#* }" = "$REPOS" ] || { echo "individual installs support exactly one repo" >&2; exit 1; }
+}
+
 # Decides where the secrets go for org installs. On a free plan, org secrets
 # are not readable by private repos, so any private repo in the list flips
 # the placement to repo scope (setup does the per repo work instead of the
 # user). --secret-scope overrides the auto detection.
 decide_secret_scope() {
-  local plan slug private_found
+  local plan slug row private_found owner_login
   if [ "$KIND" != "Organization" ]; then echo "repo"; return 0; fi
   case "$SECRET_SCOPE" in
     org) echo "org"; return 0 ;;
     repo) echo "repo"; return 0 ;;
   esac
-  plan=$(gh api "orgs/$OWNER" --jq .plan.name)
-  # the plan value drives the free plan decision via the private repo check:
-  # a free org plus any private repo flips to repo scope below
+  # any failed lookup falls safe to repo scope: it works everywhere, while
+  # a wrong org scope guess recreates the empty secret failure
+  plan=$(gh api "orgs/$OWNER" --jq .plan.name 2>/dev/null) || {
+    echo "cannot read the org plan; placing secrets at repo scope to be safe" >&2
+    echo "repo"; return 0
+  }
   [ "$plan" = "free" ] || { echo "org"; return 0; }
   for slug in $REPOS; do
-    private_found=$(gh api "repos/$slug" --jq .private)
-    [ "$private_found" = "true" ] && { echo "repo"; return 0; }
+    row=$(gh api "repos/$slug" --jq '"\(if .private then "private" else "public" end) \(.owner.login)"' 2>/dev/null) || {
+      echo "cannot read the visibility of $slug; placing secrets at repo scope to be safe" >&2
+      echo "repo"; return 0
+    }
+    private_found="${row%% *}"
+    owner_login="${row##* }"
+    # org secrets only reach repos inside the org, and only public ones on
+    # the free plan; anything else flips to repo scope
+    if [ "$owner_login" != "$OWNER" ] || [ "$private_found" = "private" ]; then
+      echo "repo"; return 0
+    fi
   done
   echo "org"
 }
@@ -352,18 +379,7 @@ main() {
   }
   echo "token expiry: $TOKEN_EXPIRY. Add a calendar reminder before this date to rotate the PAT"
 
-  case "$KIND" in
-    Organization) mode="org" ;;
-    *)
-      case "$INDIVIDUAL_MODE" in
-        copy|reference) mode="$INDIVIDUAL_MODE" ;;
-        *) echo "--individual-mode copy|reference is required for user owned boards" >&2
-           printf '%s\n' "$USAGE" >&2
-           exit 1 ;;
-      esac
-      [ "${REPOS#* }" = "$REPOS" ] || { echo "individual installs support exactly one repo" >&2; exit 1; }
-      ;;
-  esac
+  mode=$(decide_install_mode)
 
   # GitHub refuses workflow file creation without the workflow scope and
   # answers with a bare 404; catch it here with the remedy instead. The check

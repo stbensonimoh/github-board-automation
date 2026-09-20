@@ -94,10 +94,15 @@ with the shorter list). The board keeps its other repos.
 ## Plan limitation: free organizations
 
 On GitHub Free, organization secrets are not accessible by private
-repositories; GitHub's docs state this directly. If your org is on the free
-plan, the automation works in org repos that are public. For private repos on
-a free org, either upgrade the org's plan, or rerun setup with the secrets
-placed at repo scope instead. Orgs on Team or Enterprise have no such limit.
+repositories; GitHub's docs state this directly. Setup handles this
+automatically: on a free org with any private repo in the list, it places the
+secrets in each repo instead of at org level (the install stays one command;
+setup does the per repo work). On a free org with public repos only, the
+secrets go to the org level. Orgs on Team or Enterprise always use org level.
+
+`--secret-scope org|repo` overrides the detection: use it to force one
+behavior. Forcing org scope on a free org with private repos recreates the
+empty secret failure.
 
 ## When the token expires
 

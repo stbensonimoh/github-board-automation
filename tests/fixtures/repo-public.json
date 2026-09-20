@@ -1,3 +1,6 @@
 {
-  "private": false
+  "private": false,
+  "owner": {
+    "login": "org-owner"
+  }
 }
