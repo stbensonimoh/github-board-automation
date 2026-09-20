@@ -140,7 +140,7 @@ jobs:
                   break
                 fi
               done <<< "$prs"
-              [ "$found" = "true" ] || set_item_status "$n" "$T"
+              [ "$found" = "true" ] || set_item_status "$(gh api "repos/$REPO/issues/$n" --jq '.node_id')" "$T"
             done <<< "$linked"
           }
 

@@ -74,3 +74,25 @@ run_mapping() {
   run run_mapping pull_request_target closed true
   [ -z "$output" ]
 }
+
+@test "option bindings resolve the right names at runtime" {
+  {
+    echo 'set -euo pipefail'
+    echo 'fetch_fields() { echo "fields-json"; }'
+    echo 'field_id() { echo "field:$1"; }'
+    echo 'opt_id() { echo "opt:$1"; }'
+    echo 'fetch_all_items() { echo "items-json"; }'
+    sed -n '/^          fields=\$(fetch_fields "\$BOARD")$/,/^          items=\$(fetch_all_items "\$BOARD")$/p' "$YML"
+    echo 'printf "%s
+%s
+%s
+%s
+" "$STATUS_FIELD" "$B" "$P" "$R"'
+  } > "$BATS_TEST_TMPDIR/bindings.sh"
+  run env BOARD=BOARD bash "$BATS_TEST_TMPDIR/bindings.sh"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | sed -n 1p)" = "field:Status" ]
+  [ "$(printf '%s' "$output" | sed -n 2p)" = "opt:Backlog" ]
+  [ "$(printf '%s' "$output" | sed -n 3p)" = "opt:In Progress" ]
+  [ "$(printf '%s' "$output" | sed -n 4p)" = "opt:In Review" ]
+}
