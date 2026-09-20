@@ -447,14 +447,16 @@ reset_board() {
   # bash 3.2 errors on expanding a declared empty array under set -u, so the
   # length guard comes first and the expansion stays quoted
   local failed=0
+  # best effort: an already closed object is fine; the item deletions are
+  # the part that must not fail silently
   if [ "${#PR_NUMBERS[@]}" -gt 0 ]; then
     for n in "${PR_NUMBERS[@]}"; do
-      gh pr close "$n" --repo "$REPO" --delete-branch > /dev/null 2>&1 || { echo "pr close $n failed" >&2; failed=1; }
+      gh pr close "$n" --repo "$REPO" --delete-branch > /dev/null 2>&1 || true
     done
   fi
   if [ "${#ISSUE_NUMBERS[@]}" -gt 0 ]; then
     for n in "${ISSUE_NUMBERS[@]}"; do
-      gh issue close "$n" --repo "$REPO" > /dev/null 2>&1 || { echo "issue close $n failed" >&2; failed=1; }
+      gh issue close "$n" --repo "$REPO" > /dev/null 2>&1 || true
     done
   fi
   # delete only the board items the harness created, identified by the
