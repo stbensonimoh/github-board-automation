@@ -193,8 +193,13 @@ open_test_issue() {
 }
 
 open_test_pr() { # ISSUE_NUMBER LABEL -> creates a branch with one commit
-  local issue="$1" label="$2" branch
+  local issue="$1" label="$2" branch base_sha
   branch="e2e/$label-$(date +%s)"
+  # the contents API targets an EXISTING branch (the docs: branch defaults to
+  # the default branch and never creates one), so the ref comes first
+  base_sha=$(gh api "repos/$REPO/git/refs/heads/main" --jq '.object.sha')
+  gh api --method POST "repos/$REPO/git/refs" \
+    -f ref="refs/heads/$branch" -f sha="$base_sha" > /dev/null
   gh api --method PUT "repos/$REPO/contents/.e2e-$label" \
     -f message="e2e: $label" \
     -f content="aGk=" \
