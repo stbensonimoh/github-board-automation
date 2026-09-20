@@ -239,7 +239,7 @@ decide_secret_scope() {
     private_found="${row%% *}"
     owner_login="${row##* }"
     # a foreign repo is unreachable by this org's secrets on any plan
-    if [ "$owner_login" != "$OWNER" ]; then
+    if [ "$(printf '%s' "$owner_login" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')" ]; then
       echo "repo"; return 0
     fi
     # a private repo on the free plan cannot read org secrets

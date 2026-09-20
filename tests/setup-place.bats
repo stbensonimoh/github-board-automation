@@ -72,7 +72,7 @@ mock_gh_full() {
         out=''
         ;;
       *"orgs/"*)
-        if [ "${ORG_PLAN:-free}" = "not-read" ]; then out='{"message":"Not Found"}'
+        if [ "${ORG_PLAN:-free}" = "not-read" ]; then return 1
         else out=$(cat "$FIXTURES/org-plan-${ORG_PLAN:-free}.json"); fi
         ;;
       *"repos/"*)
@@ -255,7 +255,7 @@ run_setup() {
   run_setup --owner org-owner --project-number 1 --repos "org-owner/api" --token-expiry 2027-03-01
   [ "$status" -eq 0 ]
   grep -q 'secret set PROJECT_AUTOMATION_TOKEN --repo org-owner/api' "$MOCKLOG"
-  grep -q 'cannot read the org plan' "$MOCKLOG" || true
+  [[ "$output" == *"cannot read the org plan"* ]]
 }
 
 @test "a foreign owned repo flips the org install to repo scope" {
