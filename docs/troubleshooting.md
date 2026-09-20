@@ -42,6 +42,14 @@ The native Item closed workflow is disabled. Setup stops the install and
 places no secrets until you enable it in the project settings, then rerun
 setup. GitHub provides no API to enable built in workflows.
 
+## The org board's workflow sees empty secrets
+
+On a free organization, org secrets are not accessible by private
+repositories (GitHub's plan limit). Make the repo public, upgrade the org's
+plan, or place the secrets at repo scope in each repo instead. Check the
+secret's visibility: `gh api orgs/ORG/actions/secrets --jq '.secrets[] |
+"\(.name) \(.visibility)"'`.
+
 ## setup says rejecting 'x': repos must be fully qualified OWNER/REPO slugs
 
 The `--repos` list contained a bare repo name or a malformed slug. Every entry

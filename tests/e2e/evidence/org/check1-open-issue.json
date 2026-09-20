@@ -1,0 +1,10 @@
+{
+  "trigger_event": "issues/opened",
+  "item_node_id": "I_kwDOUiyt5c8AAAABSQKlyw",
+  "status_before": "",
+  "status_after": "Backlog",
+  "run_url": "https://github.com/businessity/e2e-org-api/actions/runs/35531395263",
+  "first_step_started_at": "2026-09-20T19:09:54Z",
+  "card_visible_at": "2026-09-20T19:10:16Z",
+  "elapsed_seconds": 21
+}

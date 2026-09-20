@@ -91,6 +91,21 @@ Delete the `board-sync.yml` file from that repo's `.github/workflows/` folder
 and remove the repo from the `BOARD_REPOS` list (run the setup command again
 with the shorter list). The board keeps its other repos.
 
+## Plan limitation: free organizations
+
+On GitHub Free, organization secrets are not accessible by private
+repositories; GitHub's docs state this directly. Setup handles this
+automatically: on a free org with any private repo in the list, it places the
+secrets in each repo instead of at org level (the install stays one command;
+setup does the per repo work). On a free org with public repos only, the
+secrets go to the org level. Orgs on Team or Enterprise always use org
+level, except when a listed repo belongs to another owner, which flips setup
+to repo scope the same way (org secrets only reach the org's own repos).
+
+`--secret-scope org|repo` overrides the detection: use it to force one
+behavior. Forcing org scope on a free org with private repos recreates the
+empty secret failure.
+
 ## When the token expires
 
 Setup reminds you of the expiry date. Put it in your calendar. When it gets
