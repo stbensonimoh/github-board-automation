@@ -1,10 +1,10 @@
 {
   "trigger_event": "workflow_dispatch (nightly)",
-  "item_node_id": "I_kwDOUijd-M8AAAABSP0AJw",
+  "item_node_id": "I_kwDOUijd-M8AAAABSP2vFw",
   "status_before": "",
   "status_after": "Backlog",
-  "run_url": "https://github.com/stbensonimoh/e2e-board-private/actions/runs/35527530287",
-  "first_step_started_at": "2026-09-20T17:58:07Z",
-  "card_visible_at": "2026-09-20T17:58:38Z",
-  "elapsed_seconds": 29
+  "run_url": "https://github.com/stbensonimoh/e2e-board-private/actions/runs/35528014612",
+  "first_step_started_at": "2026-09-20T18:07:00Z",
+  "card_visible_at": "2026-09-20T18:07:26Z",
+  "elapsed_seconds": 23
 }
