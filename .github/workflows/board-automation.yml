@@ -1,0 +1,183 @@
+name: Board automation (reusable)
+
+# Single home for the event to status mapping, called from every repo's
+# board-sync.yml.
+#
+#   issues opened          -> Backlog
+#   issues reopened        -> Todo
+#   PR opened / reopened   -> In Progress (+ same repo close keyword issues)
+#   review requested       -> In Review (+ linked issues)
+#   changes requested      -> In Progress (+ linked issues)
+#   review submitted, other state -> no-op (approved or commented never move a card)
+#   PR closed unmerged     -> linked issues to Todo, unless another open PR in
+#                             this repo still closes them
+#   PR merged              -> nothing (the merge closes issues; the board's
+#                             Item closed workflow moves cards to Done)
+#
+# Deliberate limits (SPEC): close refs are same repo only. Keywords followed
+# by owner/repo#N are cross repo close refs and consume the keyword.
+#
+# Ids: the Status field id and option ids are resolved by name at runtime on
+# every run; nothing board specific is hardcoded.
+
+on:
+  workflow_call:
+    inputs:
+      event_name: { required: true, type: string }
+      action: { required: true, type: string }
+      number: { required: true, type: number }
+      node_id: { required: true, type: string }
+      repository: { required: true, type: string }
+      merged: { required: false, type: boolean, default: false }
+      review_state: { required: false, type: string, default: '' }
+    secrets:
+      PROJECT_AUTOMATION_TOKEN: { required: true }
+      PROJECT_BOARD_ID: { required: true }
+
+# Shared repo wide group (SPEC Code Style): one group per repo serializes
+# sync runs with each other and with the nightly. The repository value comes
+# from the github context, which in a workflow_call run is the caller repo.
+concurrency:
+  group: board-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard node_id presence
+        env:
+          NODE: ${{ inputs.node_id }}
+        run: |
+          # a workflow_call required input does not fail on an empty value,
+          # and a workflow_dispatch run has no event payload to fall back to
+          if [ -z "$NODE" ]; then
+            echo "node_id is required: pass it with -f node_id=\$(gh api repos/OWNER/REPO/issues/NUMBER --jq .node_id)" >&2
+            exit 1
+          fi
+
+      - name: Fetch trusted helpers from the platform repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: stbensonimoh/github-board-automation
+          # immutable SHA of a commit that already contains scripts/; the
+          # release step updates this to the new immutable v1.x.y tag
+          ref: 1ce14669b5b04f730ce437edba660cfb312ca8f1
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      - name: Sync board status
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
+          BOARD: ${{ secrets.PROJECT_BOARD_ID }}
+          EVENT: ${{ inputs.event_name }}/${{ inputs.action }}
+          NUMBER: ${{ inputs.number }}
+          NODE: ${{ inputs.node_id }}
+          REPO: ${{ inputs.repository }}
+          MERGED: ${{ inputs.merged }}
+          REVIEW: ${{ inputs.review_state }}
+        run: |
+          set -euo pipefail
+          source scripts/board-lib.sh
+          PARSER=scripts/parse-linked.sh
+
+          # runtime id resolution, every run, nothing stored
+          fields=$(fetch_fields "$BOARD")
+          STATUS_FIELD=$(printf '%s' "$fields" | field_id Status)
+          B=$(printf '%s' "$fields" | opt_id Backlog)
+          T=$(printf '%s' "$fields" | opt_id Todo)
+          P=$(printf '%s' "$fields" | opt_id "In Progress")
+          R=$(printf '%s' "$fields" | opt_id "In Review")
+          items=$(fetch_all_items "$BOARD")
+
+          # mechanical add or get; addProjectV2ItemById is idempotent, it
+          # returns the existing item when the content is already on the board
+          item_id_for() {
+            local line
+            [ -n "$1" ] || { echo "empty content node id" >&2; return 1; }
+            line=$(item_line "$items" "$1")
+            if [ -z "$line" ]; then add_item "$BOARD" "$1"; else printf '%s' "${line%%$'\t'*}"; fi
+          }
+
+          set_item_status() {
+            local item
+            item=$(item_id_for "$1")
+            set_status "$BOARD" "$item" "$STATUS_FIELD" "$2"
+          }
+
+          # same repo close refs in the triggering PR body
+          linked_issue_numbers() {
+            gh api "repos/$REPO/pulls/$NUMBER" --jq '.body // ""' | bash "$PARSER"
+          }
+
+          link_linked_issues() {
+            local n linked
+            linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
+            local node
+            while IFS= read -r n; do
+              [ -n "$n" ] || continue
+              node=$(gh api "repos/$REPO/issues/$n" --jq '.node_id') || { echo "failed to resolve issue #$n" >&2; exit 1; }
+              set_item_status "$node" "$1"
+            done <<< "$linked"
+          }
+
+          # close without merge: linked issues go back to Todo unless another
+          # open PR in this repo still closes them
+          revert_linked_issues_to_todo() {
+            local n pr_num pr_body found prs linked node
+            prs=$(fetch_all_open_prs_jsonl "$REPO")
+            linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
+            while IFS= read -r n; do
+              [ -n "$n" ] || continue
+              found=false
+              while IFS= read -r pr_json; do
+                [ -n "$pr_json" ] || continue
+                pr_num=$(jq -r '.number' <<<"$pr_json")
+                [ "$pr_num" = "$NUMBER" ] && continue
+                pr_body=$(jq -r '.body // ""' <<<"$pr_json")
+                if printf '%s' "$pr_body" | bash "$PARSER" | grep -qx "$n"; then
+                  found=true
+                  break
+                fi
+              done <<< "$prs"
+              if [ "$found" != "true" ]; then
+                node=$(gh api "repos/$REPO/issues/$n" --jq '.node_id') || { echo "failed to resolve issue #$n" >&2; exit 1; }
+                set_item_status "$node" "$T"
+              fi
+            done <<< "$linked"
+          }
+
+          case "$EVENT" in
+            issues/opened)
+              set_item_status "$NODE" "$B"
+              ;;
+            issues/reopened)
+              set_item_status "$NODE" "$T"
+              ;;
+            pull_request_target/opened | pull_request_target/reopened)
+              set_item_status "$NODE" "$P"
+              link_linked_issues "$P"
+              ;;
+            pull_request_target/review_requested)
+              set_item_status "$NODE" "$R"
+              link_linked_issues "$R"
+              ;;
+            pull_request_review/submitted)
+              # approved and commented reviews are a no-op
+              if [ "$REVIEW" = "changes_requested" ]; then
+                set_item_status "$NODE" "$P"
+                link_linked_issues "$P"
+              fi
+              ;;
+            pull_request_target/closed)
+              # merged: nothing; the merge closes issues and the board native
+              # Item closed workflow moves cards to Done
+              if [ "$MERGED" != "true" ]; then
+                revert_linked_issues_to_todo
+              fi
+              ;;
+          esac
+          echo "board sync done: $EVENT #$NUMBER"
