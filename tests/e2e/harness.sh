@@ -119,7 +119,7 @@ await_new_run() {
   while [ "$tries" -gt 0 ]; do
     line=$(gh run list --repo "$REPO" --workflow "$wf" --limit 5 \
       --json databaseId,url,startedAt \
-      --jq "[.[] | select(.databaseId > $after and .startedAt != null)][0] | \"\(.databaseId) \(.url) \(.startedAt)\"" 2>/dev/null || true)
+      --jq "first(.[] | select(.databaseId > $after and .startedAt != null)) | if . == null then empty else \"\(.databaseId) \(.url) \(.startedAt)\" end" 2>/dev/null || true)
     [ -n "$line" ] && { printf '%s\n' "$line"; return 0; }
     sleep "$POLL_INTERVAL"
     tries=$((tries - 1))
