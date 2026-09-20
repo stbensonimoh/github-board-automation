@@ -7,8 +7,9 @@
 #   - ensure the five Status options exist: fail naming any missing required
 #     option (Todo, In Progress, Done), append missing Backlog and In Review
 #     via updateProjectV2Field read modify write. The mutation REPLACES the
-#     whole option list, so every existing option is echoed back unchanged
-#     and ids are never sent (GitHub matches options by name)
+#     whole option list, so every existing option is echoed back by id, name,
+#     color, and description; identity and existing item field values survive
+#     only when the id is included. New options are submitted without ids
 #   - verify the board native Item closed workflow is enabled; no API can
 #     enable built in workflows, so a disabled one fails pointing at the
 #     project settings UI
@@ -40,9 +41,12 @@ while [ $# -gt 0 ]; do
       shift
       [ $# -gt 0 ] || { echo "--repos needs at least one OWNER/REPO slug" >&2; exit 1; }
       while [ $# -gt 0 ] && [[ ! "$1" == --* ]]; do
-        case "$1" in */*) REPOS="${REPOS:+$REPOS }$1" ;;
-          *) echo "rejecting '$1': repos must be fully qualified OWNER/REPO slugs" >&2; exit 1 ;;
-        esac
+        if [[ "$1" =~ ^[^/]+/[^/]+$ ]]; then
+          REPOS="${REPOS:+$REPOS }$1"
+        else
+          echo "rejecting '$1': repos must be fully qualified OWNER/REPO slugs" >&2
+          exit 1
+        fi
         shift
       done ;;
     --token-expiry) TOKEN_EXPIRY="$2"; shift 2 ;;
@@ -57,7 +61,7 @@ done
 [ -n "$REPOS" ] || { echo "--repos is required (space separated OWNER/REPO slugs)" >&2; printf '%s\n' "$USAGE" >&2; exit 1; }
 
 if [ -n "$TOKEN_EXPIRY" ]; then
-  echo "token expiry: $TOKEN_EXPIRY - add a calendar reminder before this date to rotate the PAT"
+  echo "token expiry: $TOKEN_EXPIRY. Add a calendar reminder before this date to rotate the PAT"
 fi
 
 # setup auth: the invoking user's gh auth only, never the runtime token
@@ -90,10 +94,10 @@ resolve_board_id() {
 
 # Read modify write with updateProjectV2Field: the mutation replaces the
 # whole option list, so the complete list is submitted with every existing
-# option echoed back unchanged (name, color, description) and only the
-# missing optional options appended. Ids are verification only and are never
-# submitted; GitHub matches options by name. Required options that are
-# missing cannot be fixed by a field edit, so that fails loud.
+# option echoed back unchanged (id, name, color, description) and only the
+# missing optional options appended. Identity and existing item field values
+# survive only when each existing option's id is included. Required options
+# that are missing cannot be fixed by a field edit, so that fails loud.
 ensure_status_options() {
   local fields="$1" dry_run="$2" name id fid options_json
   local -a need=()
@@ -145,7 +149,9 @@ ensure_status_options() {
 # point at the project settings UI; the install docs carry the manual step.
 check_item_closed_workflow() {
   local workflows="$1" enabled
-  enabled=$(printf '%s' "$workflows" | jq -r 'first(.data.node.workflows.nodes[] | select(.name == "Item closed") | .enabled) // empty')
+  # first() yields nothing when no node matches; do NOT add // empty, it
+  # would catch an existing but disabled workflow and hide the UI message
+  enabled=$(printf '%s' "$workflows" | jq -r 'first(.data.node.workflows.nodes[] | select(.name == "Item closed") | .enabled)')
   if [ -z "$enabled" ]; then
     echo "no 'Item closed' workflow found on this board; check the project settings" >&2
     return 1

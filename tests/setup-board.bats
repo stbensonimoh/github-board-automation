@@ -189,7 +189,7 @@ mock_gh_board() {
   run bash "$SETUP" --owner some-user --project-number 1 --repos some-user/repo
   [ "$status" -ne 0 ]
   [[ "$output" == *"Item closed"* ]]
-  [[ "$output" == *"project"* ]]
+  [[ "$output" == *"enable it in the project settings"* ]]
 }
 
 @test "enabled Item closed workflow passes" {
