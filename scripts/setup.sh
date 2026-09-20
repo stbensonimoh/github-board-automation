@@ -193,14 +193,20 @@ check_item_closed_workflow() {
 # every participating repo inherits them with zero per repo work. Individual
 # installs place repo scope in the single repo.
 place_secrets_and_vars() {
-  local mode="$1" token="$2" scope_args
+  local mode="$1" token="$2" scope_args vis_args
   case "$mode" in
-    org) scope_args=(--org "$OWNER") ;;
-    *) scope_args=(--repo "$REPOS") ;;
+    org)
+      scope_args=(--org "$OWNER")
+      # org secrets default to private visibility with no selected repos,
+      # which no repo can read; the org wide form is the zero per repo work
+      # the org install promises
+      vis_args=(--visibility all) ;;
+    *) scope_args=(--repo "$REPOS"); vis_args=() ;;
   esac
-  printf '%s' "$token" | gh secret set PROJECT_AUTOMATION_TOKEN "${scope_args[@]}"
-  printf '%s' "$BOARD" | gh secret set PROJECT_BOARD_ID "${scope_args[@]}"
-  printf '%s' "$REPOS" | gh variable set BOARD_REPOS "${scope_args[@]}"
+  # the expansion guard: an empty vis_args array is unbound on bash 3.2
+  printf '%s' "$token" | gh secret set PROJECT_AUTOMATION_TOKEN "${scope_args[@]}" ${vis_args[@]+"${vis_args[@]}"}
+  printf '%s' "$BOARD" | gh secret set PROJECT_BOARD_ID "${scope_args[@]}" ${vis_args[@]+"${vis_args[@]}"}
+  printf '%s' "$REPOS" | gh variable set BOARD_REPOS "${scope_args[@]}" ${vis_args[@]+"${vis_args[@]}"}
   echo "secrets and BOARD_REPOS placed at ${scope_args[1]} scope"
 }
 
