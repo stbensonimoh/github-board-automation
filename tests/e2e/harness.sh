@@ -398,6 +398,7 @@ nightly_test() {
   line_b=$(item_line "$items" "$node_b")
   item_a=${line_a%%$'\t'*}
   item_b=${line_b%%$'\t'*}
+  echo "nightly: deleting item $item_a, blanking item $item_b"
   delete_item "$BOARD" "$item_a"
   clear_status "$BOARD" "$item_b" "$(printf '%s' "$fields" | field_id Status)"
 

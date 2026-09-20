@@ -1,10 +1,10 @@
 {
   "trigger_event": "pull_request_target/review_requested",
-  "item_node_id": "I_kwDOUijd-M8AAAABSPozxQ",
+  "item_node_id": "I_kwDOUijd-M8AAAABSPrsKQ",
   "status_before": "In Progress",
   "status_after": "In Review",
-  "run_url": "https://github.com/stbensonimoh/e2e-board-private/actions/runs/35525656549",
-  "first_step_started_at": "2026-09-20T17:22:25Z",
-  "card_visible_at": "2026-09-20T17:22:46Z",
-  "elapsed_seconds": 16
+  "run_url": "https://github.com/stbensonimoh/e2e-board-private/actions/runs/35526189280",
+  "first_step_started_at": "2026-09-20T17:32:31Z",
+  "card_visible_at": "2026-09-20T17:32:58Z",
+  "elapsed_seconds": 22
 }
