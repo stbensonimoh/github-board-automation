@@ -93,8 +93,8 @@ load_harness() {
   ISSUE_NUMBERS=(12)
   ISSUE_NODES=(NODE_A)
   PR_NODES=(NODE_B)
-  # stub: two board items, both belonging to the tracked test objects
-  fetch_all_items() { printf 'PVTI_1\tNODE_A\tTodo\nPVTI_2\tNODE_B\t'; }
+  # stub: two tracked items plus one untracked item that must survive
+  fetch_all_items() { printf 'PVTI_1\tNODE_A\tTodo\nPVTI_2\tNODE_B\t\nPVTI_3\tNODE_OTHER\tDone'; }
   gh() {
     printf '%s\n' "$*" >> "$MOCKLOG"
     case "$*" in
@@ -106,8 +106,8 @@ load_harness() {
   grep -q 'pr close 4' "$MOCKLOG"
   grep -q 'pr close 5' "$MOCKLOG"
   grep -q 'issue close 12' "$MOCKLOG"
-  grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_test00000000", itemId: "PVTI_1" })' "$MOCKLOG" || { echo "LOG:"; cat "$MOCKLOG"; return 1; }
+  grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_test00000000", itemId: "PVTI_1" })' "$MOCKLOG"
   grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_test00000000", itemId: "PVTI_2" })' "$MOCKLOG"
-  # on failure show the log for diagnosis
-  cat "$MOCKLOG" > /dev/null
+  # the untracked item is never deleted
+  run ! grep -q 'itemId: "PVTI_3"' "$MOCKLOG"
 }

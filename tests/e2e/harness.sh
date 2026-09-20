@@ -106,23 +106,40 @@ evidence() {
 # The newest caller workflow run that started AFTER the given run id, printed
 # as "<url> <startedAt>". Polls until it appears: the just triggered run may
 # still be queued, and the pre-trigger newest run would give wrong evidence.
+# await_new_run WORKFLOW AFTER_ID: the newest run of that workflow started
+# after the given run id, printed as "<id> <url> <startedAt>". Polls until it
+# appears; the just triggered run may still be queued.
 await_new_run() {
-  local after="$1" tries="${2:-40}" line
+  local wf="$1" after="$2" tries="${3:-40}" line
   while [ "$tries" -gt 0 ]; do
-    line=$(gh run list --repo "$REPO" --workflow "Board sync" --limit 5 \
+    line=$(gh run list --repo "$REPO" --workflow "$wf" --limit 5 \
       --json databaseId,url,startedAt \
-      --jq "[.[] | select(.databaseId > $after and .startedAt != null)][0] | \"\(.url) \(.startedAt)\"" 2>/dev/null || true)
+      --jq "[.[] | select(.databaseId > $after and .startedAt != null)][0] | \"\(.databaseId) \(.url) \(.startedAt)\"" 2>/dev/null || true)
     [ -n "$line" ] && { printf '%s\n' "$line"; return 0; }
     sleep "$POLL_INTERVAL"
     tries=$((tries - 1))
   done
-  echo "no new workflow run started after run $after" >&2
+  echo "no new $wf run started after run $after" >&2
   return 1
 }
 
 newest_run_id() {
-  gh run list --repo "$REPO" --workflow "Board sync" --limit 1 \
+  gh run list --repo "$REPO" --workflow "$1" --limit 1 \
     --json databaseId --jq '.[0].databaseId'
+}
+
+# Wait until the given run reaches a completed state. The status readers
+# must not run while the dispatched run is still executing.
+await_run_completed() {
+  local id="$1" tries="${2:-60}" status
+  while [ "$tries" -gt 0 ]; do
+    status=$(gh run view "$id" --repo "$REPO" --json status --jq .status 2>/dev/null || true)
+    [ "$status" = "completed" ] && return 0
+    sleep "$POLL_INTERVAL"
+    tries=$((tries - 1))
+  done
+  echo "run $id did not complete in time" >&2
+  return 1
 }
 
 dispatch() {
@@ -144,12 +161,15 @@ record_pr() { # NUMBER NODE
   PR_NODES+=("$2")
 }
 
-# Wait for the triggered run to start, then poll the card. Prints the
-# elapsed seconds from the run's first step start.
+# Wait for the triggered run to start AND complete, then poll the card.
+# Prints the elapsed seconds from the run's first step start. Without the
+# completion wait, a card already showing the wanted status would return
+# before the run executed, making the check vacuous.
 run_then_status() { # NODE WANT BUDGET BEFORE_RUN_ID
-  local node="$1" want="$2" budget="$3" before="$4" line url started
-  line=$(await_new_run "$before")
-  read -r url started <<< "$line"
+  local node="$1" want="$2" budget="$3" before="$4" line id url started
+  line=$(await_new_run "Board sync" "$before")
+  read -r id url started <<< "$line"
+  await_run_completed "$id"
   await_status "$node" "$want" "$budget" "$started"
 }
 
@@ -188,11 +208,11 @@ evfile() { echo "$EVIDENCE_DIR/check$1-$2.json"; }
 # check1: open test issue, expect Backlog within 90 seconds
 check1_open_issue() {
   local before url started elapsed
-  before=$(newest_run_id || echo 0)
+  before=$(newest_run_id "Board sync" || echo 0)
   open_test_issue
   sleep 5
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "Backlog" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "$before" 1)"
+  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 1 open-issue)" "issues/opened" "${ISSUE_NODES[0]}" "" "Backlog" "$url" "$started" "$elapsed"
   echo "check 1 ok: Backlog in ${elapsed}s"
 }
@@ -200,11 +220,11 @@ check1_open_issue() {
 # check2: close the issue, reopen it, expect Todo
 check2_reopen_issue() {
   local n="${ISSUE_NUMBERS[0]}" before url started elapsed
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   gh issue close "$n" --repo "$REPO"
   gh issue reopen "$n" --repo "$REPO"
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "Todo" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "$before" 1)"
+  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 2 reopen-issue)" "issues/reopened" "${ISSUE_NODES[0]}" "Backlog" "Todo" "$url" "$started" "$elapsed"
   echo "check 2 ok: Todo in ${elapsed}s"
 }
@@ -216,7 +236,7 @@ check3_open_pr_a() {
   open_test_pr "${ISSUE_NUMBERS[0]}" "prA"
   elapsed_e=$(run_then_status "${ISSUE_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
   elapsed_p=$(run_then_status "${PR_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "$before" 1)"
+  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 3 open-pr)" "pull_request_target/opened" "${ISSUE_NODES[0]}" "Todo" "In Progress" "$url" "$started" "$elapsed_e"
   evidence "$(evfile 3b open-pr-prcard)" "pull_request_target/opened" "${PR_NODES[0]}" "" "In Progress" "$url" "$started" "$elapsed_p"
   echo "check 3 ok: issue ${elapsed_e}s, PR ${elapsed_p}s"
@@ -230,7 +250,7 @@ check4_competing_pr() {
   open_test_pr "${ISSUE_NUMBERS[0]}" "prB"
   gh pr close "${PR_NUMBERS[0]}" --repo "$REPO" --delete-branch
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "$before" 1)"
+  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 4 competing-pr)" "pull_request_target/closed" "${ISSUE_NODES[0]}" "In Progress" "In Progress" "$url" "$started" "$elapsed"
   echo "check 4 ok: still In Progress in ${elapsed}s"
 }
@@ -242,7 +262,7 @@ check5_review_requested() {
   dispatch "pull_request_target" "review_requested" "${PR_NUMBERS[1]}" "${PR_NODES[1]}"
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "In Review" "$FIRST_CARD_BUDGET" "$before")
   run_then_status "${PR_NODES[1]}" "In Review" "$FIRST_CARD_BUDGET" "$before" > /dev/null
-  read -r url started <<< "$(await_new_run "$before" 1)"
+  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 5 review-requested)" "pull_request_target/review_requested" "${ISSUE_NODES[0]}" "In Progress" "In Review" "$url" "$started" "$elapsed"
   echo "check 5 ok: In Review in ${elapsed}s"
 }
@@ -254,7 +274,7 @@ check6_changes_requested() {
   dispatch "pull_request_review" "submitted" "${PR_NUMBERS[1]}" "${PR_NODES[1]}" "changes_requested"
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
   run_then_status "${PR_NODES[1]}" "In Progress" "$FIRST_CARD_BUDGET" "$before" > /dev/null
-  read -r url started <<< "$(await_new_run "$before" 1)"
+  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 6 changes-requested)" "pull_request_review/submitted" "${ISSUE_NODES[0]}" "In Review" "In Progress" "$url" "$started" "$elapsed"
   echo "check 6 ok: In Progress in ${elapsed}s"
 }
@@ -283,7 +303,7 @@ check8_close_unmerged() {
   before=$(newest_run_id)
   gh pr close "${PR_NUMBERS[1]}" --repo "$REPO"
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "Todo" "$FIRST_CARD_BUDGET" "$before")
-  read -r url started <<< "$(await_new_run "$before" 1)"
+  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 8 close-unmerged)" "pull_request_target/closed" "${ISSUE_NODES[0]}" "In Progress" "Todo" "$url" "$started" "$elapsed"
   echo "check 8 ok: Todo in ${elapsed}s"
 }
@@ -296,17 +316,19 @@ check9_merge_done() {
   gh pr reopen "${PR_NUMBERS[1]}" --repo "$REPO"
   elapsed_e=$(run_then_status "${ISSUE_NODES[0]}" "In Progress" "$FIRST_CARD_BUDGET" "$before")
   run_then_status "${PR_NODES[1]}" "In Progress" "$FIRST_CARD_BUDGET" "$before" > /dev/null
-  read -r url started <<< "$(await_new_run "$before" 1)"
+  read -r url started <<< "$(await_new_run "Board sync" "$before" 1)"
   evidence "$(evfile 9 reopen-pr)" "pull_request_target/reopened" "${ISSUE_NODES[0]}" "Todo" "In Progress" "$url" "$started" "$elapsed_e"
   evidence "$(evfile 9b reopen-pr-prcard)" "pull_request_target/reopened" "${PR_NODES[1]}" "Todo" "In Progress" "$url" "$started" "$elapsed_e"
 
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board sync")
   gh pr merge "${PR_NUMBERS[1]}" --repo "$REPO" --squash
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "Done" "$DONE_BUDGET" "$before")
+  local merge_url merge_started
+  read -r merge_url merge_started <<< "$(await_new_run "Board sync" "$before" 1)"
   local state
   state=$(gh api "repos/$REPO/issues/${ISSUE_NUMBERS[0]}" --jq .state)
   [ "$state" = "closed" ] || { echo "expected the issue closed after merge, got $state" >&2; return 1; }
-  evidence "$(evfile 10 merge-done)" "pull_request_target/closed (merged)" "${ISSUE_NODES[0]}" "In Progress" "Done" "$url" "$started" "$elapsed"
+  evidence "$(evfile 10 merge-done)" "pull_request_target/closed (merged)" "${ISSUE_NODES[0]}" "In Progress" "Done" "$merge_url" "$merge_started" "$elapsed"
   echo "check 9 ok: issue closed, card Done in ${elapsed}s (native Item closed workflow)"
 }
 
@@ -336,9 +358,9 @@ nightly_test() {
   # two fresh issues: A gets deleted, B gets blanked; the Done card from the
   # checks phase is the untouched control
   num_a=$(open_test_issue)
-  node_a="${ISSUE_NODES[-1]}"
+  node_a="${ISSUE_NODES[$(( ${#ISSUE_NODES[@]} - 1 ))]}"
   open_test_issue
-  node_b="${ISSUE_NODES[-1]}"
+  node_b="${ISSUE_NODES[$(( ${#ISSUE_NODES[@]} - 1 ))]}"
 
   # reopen A through the real state row so its card is Todo, then blank it:
   # the nightly fills blanks with the default and never infers history
@@ -355,11 +377,14 @@ nightly_test() {
   clear_status "$BOARD" "$item_b" "$(printf '%s' "$fields" | field_id Status)"
 
   # run the nightly and poll: A reappears as Backlog, B fills Backlog
-  before=$(newest_run_id)
+  before=$(newest_run_id "Board nightly sync")
   gh workflow run "Board nightly sync" --repo "$REPO"
-  sleep 10
-  elapsed=$(run_then_status "$node_a" "Backlog" "$FIRST_CARD_BUDGET" "$before")
-  elapsed_b=$(run_then_status "$node_b" "Backlog" "$FIRST_CARD_BUDGET" "$before")
+  local line id nightly_url nightly_started
+  line=$(await_new_run "Board nightly sync" "$before")
+  read -r id nightly_url nightly_started <<< "$line"
+  await_run_completed "$id"
+  elapsed=$(await_status "$node_a" "Backlog" "$FIRST_CARD_BUDGET" "$nightly_started")
+  elapsed_b=$(await_status "$node_b" "Backlog" "$FIRST_CARD_BUDGET" "$nightly_started")
 
   # the control: the merged PR's card stayed Done (no overwrite)
   control_status=$(card_status "${PR_NODES[1]}")
@@ -368,8 +393,8 @@ nightly_test() {
     return 1
   }
 
-  evidence "$(evfile nightly backfill)" "workflow_dispatch (nightly)" "$node_a" "" "Backlog" "n/a" "$(now_iso)" "$elapsed"
-  evidence "$(evfile nightly-blank backfill)" "workflow_dispatch (nightly)" "$node_b" "Todo" "Backlog" "n/a" "$(now_iso)" "$elapsed_b"
+  evidence "$(evfile nightly backfill)" "workflow_dispatch (nightly)" "$node_a" "" "Backlog" "$nightly_url" "$nightly_started" "$elapsed"
+  evidence "$(evfile nightly-blank backfill)" "workflow_dispatch (nightly)" "$node_b" "Todo" "Backlog" "$nightly_url" "$nightly_started" "$elapsed_b"
   echo "nightly ok: readd ${elapsed}s, blank fill ${elapsed_b}s, control untouched"
 }
 
@@ -380,14 +405,15 @@ reset_board() {
   local n items content item_id
   # bash 3.2 errors on expanding a declared empty array under set -u, so the
   # length guard comes first and the expansion stays quoted
+  local failed=0
   if [ "${#PR_NUMBERS[@]}" -gt 0 ]; then
     for n in "${PR_NUMBERS[@]}"; do
-      gh pr close "$n" --repo "$REPO" --delete-branch > /dev/null 2>&1 || true
+      gh pr close "$n" --repo "$REPO" --delete-branch > /dev/null 2>&1 || { echo "pr close $n failed" >&2; failed=1; }
     done
   fi
   if [ "${#ISSUE_NUMBERS[@]}" -gt 0 ]; then
     for n in "${ISSUE_NUMBERS[@]}"; do
-      gh issue close "$n" --repo "$REPO" > /dev/null 2>&1 || true
+      gh issue close "$n" --repo "$REPO" > /dev/null 2>&1 || { echo "issue close $n failed" >&2; failed=1; }
     done
   fi
   # delete only the board items the harness created, identified by the
@@ -403,8 +429,12 @@ reset_board() {
     done
     [ "$tracked" = "true" ] || continue
     item_id=$(item_line "$items" "$content" | cut -f1)
-    [ -n "$item_id" ] && delete_item "$BOARD" "$item_id" 2>/dev/null || true
+    if [ -n "$item_id" ] && ! delete_item "$BOARD" "$item_id" 2>/dev/null; then
+      echo "delete $item_id failed" >&2
+      failed=1
+    fi
   done <<< "$items"
+  [ "$failed" -eq 0 ] || { echo "reset incomplete" >&2; return 1; }
   echo "reset complete"
 }
 
@@ -443,7 +473,7 @@ provision() {
     --dry-run
   printf '%s\n' "$E2E_TOKEN" | bash "$HARNESS_DIR/../../scripts/setup.sh" \
     --owner "$E2E_OWNER" --project-number "$number" --repos "$E2E_REPOS" \
-    --token-expiry "$E2E_TOKEN_EXPIRY"
+    --token-expiry "$E2E_TOKEN_EXPIRY" --individual-mode copy
 
   echo "export E2E_PROJECT_ID=$id for the checks phase"
 }
@@ -462,11 +492,23 @@ usage() {
 main() {
   local cmd="${1:-checks}"
   case "$cmd" in
-    provision) provision ;;
-    checks) checks ;;
-    nightly) nightly_test ;;
-    reset) reset_board ;;
+    provision|checks|nightly|reset) ;;
     *) usage; exit 1 ;;
+  esac
+  # shellcheck disable=SC1091
+  source "$HARNESS_DIR/../../scripts/board-lib.sh"
+  case "$cmd" in
+    provision)
+      : "${E2E_TOKEN:?E2E_TOKEN is required}" "${E2E_OWNER:?E2E_OWNER is required}" \
+        "${E2E_REPOS:?E2E_REPOS is required}" "${E2E_TOKEN_EXPIRY:?E2E_TOKEN_EXPIRY is required}"
+      provision ;;
+    checks|nightly|reset)
+      : "${E2E_REPO:?E2E_REPO is required}" "${E2E_PROJECT_ID:?E2E_PROJECT_ID is required}"
+      case "$cmd" in
+        checks) checks ;;
+        nightly) nightly_test ;;
+        reset) reset_board ;;
+      esac ;;
   esac
 }
 
