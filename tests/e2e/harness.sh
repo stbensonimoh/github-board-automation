@@ -334,7 +334,7 @@ check9_merge_done() {
   gh pr merge "${PR_NUMBERS[1]}" --repo "$REPO" --squash
   elapsed=$(run_then_status "${ISSUE_NODES[0]}" "Done" "$DONE_BUDGET" "$before")
   local merge_url merge_started
-  read -r merge_url merge_started <<< "$(await_new_run "Board sync" "$before" 1)"
+  read -r _ merge_url merge_started <<< "$(await_new_run "Board sync" "$before" 1)"
   local state
   state=$(gh api "repos/$REPO/issues/${ISSUE_NUMBERS[0]}" --jq .state)
   [ "$state" = "closed" ] || { echo "expected the issue closed after merge, got $state" >&2; return 1; }
@@ -497,6 +497,7 @@ usage() {
   echo "  checks     the eight checks plus the no-op (needs E2E_REPO + E2E_PROJECT_ID)"
   echo "  nightly    the backfill test (needs E2E_REPO + E2E_PROJECT_ID)"
   echo "  reset      close test objects and delete their board items"
+  echo "  all        checks, then nightly, then reset in one process (recommended)"
 }
 
 main() {
