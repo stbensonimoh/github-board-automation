@@ -125,6 +125,7 @@ write_if_blank() { echo "write:$4:$5"; }'
   run env BOARD_REPOS="o/r" BOARD=b fields=f items=i B=B P=P bash -c "$stub
 $block"
   [ "$status" -ne 0 ]
+  [[ "$output" == *"failed to fetch open PRs"* ]]
 }
 
 @test "nightly pins the helper fetch to the same ref as the reusable workflow" {
