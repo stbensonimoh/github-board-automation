@@ -144,16 +144,18 @@ ensure_status_options() {
   # say option identity and existing item field values are only preserved
   # when the id is included. New options are submitted without ids. The ids
   # stay transient; they are never stored.
-  # GraphQL object literals are not JSON: keys stay unquoted and only the
-  # values are quoted strings, so each object is assembled with tojson
-  # escaping (safe for any name with quotes or backslashes).
+  # GraphQL object literals are not JSON: keys stay unquoted, string values
+  # are quoted with tojson escaping (safe for any name with quotes or
+  # backslashes), and enum values like color stay bare tokens. Each existing
+  # option is echoed back WITH its id: the schema says option identity and
+  # existing item field values are only preserved when the id is included.
   options_gql=$(printf '%s' "$fields" | jq -r '
     [.data.node.fields.nodes[] | select(.name == "Status") | .options[]
-      | (if .id then "id: \(.id | tojson), " else "" end)
-      + "name: \(.name | tojson), color: \(.color // "GRAY" | tojson), description: \(.description // "" | tojson)"]
+      | "{" + (if .id then "id: \(.id | tojson), " else "" end)
+      + "name: \(.name | tojson), color: \(.color // "GRAY"), description: \((.description // "") | tojson)}"]
     | join(", ")')
   for name in "${need[@]}"; do
-    options_gql="$options_gql, name: $(printf '%s' "$name" | jq -Rr .), color: \"GRAY\", description: \"\""
+    options_gql="$options_gql, {name: $(printf '%s' "$name" | jq -R .), color: GRAY, description: \"\"}"
   done
   gh api graphql -f query="mutation { updateProjectV2Field(input: { fieldId: \"$fid\", singleSelectOptions: [$options_gql] }) { field { ... on ProjectV2SingleSelectField { options { id name } } } } }" \
     | jq -r '.data.updateProjectV2Field.field.options | map(.name) | join(", ")' \

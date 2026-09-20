@@ -120,9 +120,17 @@ mock_gh_board() {
     [[ "$mutation" == *"id: \"$id\""* ]] || { echo "mutation dropped existing option id: $id"; return 1; }
   done
   [[ "$mutation" == *'ready to start'* ]] || { echo "description lost"; return 1; }
-  [[ "$mutation" == *'color: "GREEN"'* ]] || { echo "color lost"; return 1; }
+  [[ "$mutation" == *'color: GREEN'* ]] || { echo "color must be a bare enum token"; return 1; }
   # the field id is an inline literal
   [[ "$mutation" == *'fieldId: "PVTSSF_lADOstatus00000"'* ]]
+  # GraphQL object literals: each option is a braced object, the array is
+  # bracketed, and adjacent options are comma separated
+  [[ "$mutation" == *'singleSelectOptions: [{id: "id_todo"'* ]] || { echo "option objects missing braces"; return 1; }
+  [[ "$mutation" == *'}, {'* ]] || { echo "options not comma separated objects"; return 1; }
+  [[ "$mutation" == *'description: ""}]'* ]] || { echo "option list not closed"; return 1; }
+  # appended names are quoted strings, not bare tokens
+  [[ "$mutation" == *'{name: "Backlog", color: GRAY, description: ""}'* ]] || { echo "appended option malformed"; return 1; }
+  [[ "$mutation" == *'{name: "In Review", color: GRAY, description: ""}'* ]] || { echo "appended option malformed"; return 1; }
 }
 
 @test "--repos accepts multiple slugs and rejects bare names" {
