@@ -129,8 +129,10 @@ await_new_run() {
 }
 
 newest_run_id() {
+  # a repo with zero runs prints the string null otherwise, which poisons
+  # the comparison in await_new_run
   gh run list --repo "$REPO" --workflow "$1" --limit 1 \
-    --json databaseId --jq '.[0].databaseId'
+    --json databaseId --jq '.[0].databaseId // 0'
 }
 
 # Wait until the given run reaches a completed state. The status readers
