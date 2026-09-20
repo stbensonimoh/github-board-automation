@@ -1,35 +1,97 @@
 # github-board-automation
 
-Reusable GitHub Project board automation with a 1 minute install for any user
-or org board.
+Keep your GitHub project board up to date automatically. When your team opens
+issues and pull requests, the right card appears in the right column. When
+work moves, the card moves. Nobody drags cards by hand.
 
-## Quickstart
+Setup takes about a minute.
 
-One setup command plus merged caller files puts any ProjectV2 board to work:
-issues land on the board as Backlog, PRs and their linked issues move through
-In Progress and In Review, closed without merge they return to Todo, and a
-merge hands the card to the board's native Item closed workflow for Done.
+## What it does
 
-```bash
-git clone https://github.com/stbensonimoh/github-board-automation.git
-cd github-board-automation
-printf '%s' "$TOKEN" | bash scripts/setup.sh \
-  --owner YOUR-OWNER --project-number BOARD_NUMBER \
-  --repos YOUR-OWNER/YOUR-REPO \
-  --individual-mode copy --token-expiry YYYY-MM-DD
+| What happens | Where the card goes |
+| --- | --- |
+| Someone opens an issue | A card appears in Backlog |
+| Someone reopens an issue | Back to Todo |
+| Someone opens a pull request that fixes an issue | The pull request and the issue move to In Progress |
+| Someone asks for a review | In Review |
+| A reviewer asks for changes | Back to In Progress |
+| Someone approves the review | Nothing changes (that is on purpose) |
+| The pull request is closed without merging | The issue goes back to Todo |
+| The pull request is merged | The issue closes and the card moves to Done |
+
+Moving an issue from Backlog to Todo stays a human decision: that is triage.
+
+## How to set it up
+
+### Step 1. Install two free tools
+
+Open the Terminal app on your Mac (or the terminal on Linux). Paste these two
+commands, one at a time, pressing Enter after each:
+
+```
+brew install gh jq
 ```
 
-Prerequisites: a clone of this repo (the script reads templates next to
-itself), `gh` CLI logged in, `jq` installed, and a token per the guides below.
+If `brew` is not recognized, install Homebrew first by following the
+instructions at https://brew.sh (one copy-paste command on that page).
 
-Which guide to read:
+### Step 2. Sign in to GitHub from the terminal
 
-- Own an org with several repos? See docs/install-org.md. Fine grained PAT
-  with Organization Projects read and write.
-- Personal repo on a personal board? See docs/install-individual.md. A
-  classic PAT with `project` and `repo` scopes is required: fine grained PATs
-  cannot access user owned projects.
-- Something broke? See docs/troubleshooting.md.
+```
+gh auth login
+```
+
+Answer the questions it asks. Choose GitHub.com, HTTPS, and log in with your
+browser.
+
+### Step 3. Get your project board ready
+
+On github.com, go to your profile or organization page, click Projects, and
+create a new project (Table or Board view both work). Give it the columns
+Backlog, Todo, In Progress, In Review, and Done. New boards start with only
+Todo, In Progress, and Done, so add Backlog and In Review by clicking the plus
+sign at the right end of the board.
+
+The board's address looks like
+`https://github.com/users/YOUR-NAME/projects/3`. That last number (here, 3) is
+your **project number**. Write it down.
+
+### Step 4. Get your access token
+
+A token is a long password that lets the automation touch your board.
+
+1. On github.com, click your profile picture, then Settings
+2. Scroll to the bottom of the left sidebar and click Developer settings
+3. Click Personal access tokens, then Tokens (classic)
+4. Click Generate new token (classic)
+5. Give it a name like board automation, pick an expiration date
+6. Tick the checkboxes called `repo` and `project`
+7. Click Generate new token and copy the long token it shows (it starts with
+   `ghp_`)
+
+Personal boards need this classic token. (Fine-grained tokens, the newer kind,
+cannot touch personal boards. Org boards can use either.)
+
+### Step 5. Download this tool and run one command
+
+```
+git clone https://github.com/stbensonimoh/github-board-automation.git
+cd github-board-automation
+printf '%s' "PASTE YOUR TOKEN HERE" | bash scripts/setup.sh   --owner YOUR-NAME --project-number YOUR-NUMBER   --repos YOUR-NAME/YOUR-REPO   --individual-mode copy --token-expiry 2027-06-01
+```
+
+Replace the parts in capital letters: your GitHub name, your project number,
+your repo, and a date about six months out (the tool reminds you when the
+token expires). Paste your token where it says PASTE YOUR TOKEN HERE.
+
+Running organizations: use docs/install-org.md. Anything else: see
+docs/install-individual.md and docs/troubleshooting.md.
+
+### Step 6. Watch it work
+
+Open a test issue in your repo. Within about a minute, a card appears on your
+board in Backlog. Open a pull request that says `Closes #1` in its
+description, and watch it move.
 
 ## How it works
 
