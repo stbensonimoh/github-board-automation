@@ -1,0 +1,21 @@
+{
+  "data": {
+    "node": {
+      "items": {
+        "nodes": [
+          {
+            "id": "PVTI_itemOne000000",
+            "content": { "__typename": "Issue", "id": "I_issueNode0000001" },
+            "fieldValueByName": { "name": "Todo" }
+          },
+          {
+            "id": "PVTI_itemTwo000000",
+            "content": { "__typename": "PullRequest", "id": "PR_pullNode0000001" },
+            "fieldValueByName": null
+          }
+        ],
+        "pageInfo": { "hasNextPage": true, "endCursor": "CURSOR_PAGE_ONE" }
+      }
+    }
+  }
+}
