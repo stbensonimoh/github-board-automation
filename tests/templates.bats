@@ -7,6 +7,13 @@
 SYNC="$BATS_TEST_DIRNAME/../templates/board-sync.yml"
 NIGHTLY="$BATS_TEST_DIRNAME/../templates/board-nightly-sync.yml"
 
+@test "templates stay out of the live workflows directory" {
+  # GitHub runs every YAML in .github/workflows; a template there fires on
+  # real events and fails on the not yet existing v1 tag
+  [ ! -e "$BATS_TEST_DIRNAME/../.github/workflows/board-sync.yml" ]
+  [ ! -e "$BATS_TEST_DIRNAME/../.github/workflows/board-nightly-sync.yml" ]
+}
+
 @test "caller is at most 40 lines" {
   [ "$(wc -l < "$SYNC" | tr -d ' ')" -le 40 ]
 }
