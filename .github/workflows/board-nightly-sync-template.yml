@@ -1,0 +1,64 @@
+name: Board nightly sync
+
+# Safety net: daily backfill for anything the event driven automation missed
+# (token expiry, outages, missed events). Adds open issues and PRs that are
+# missing from the board, fills blank statuses (Backlog for issues, In
+# Progress for PRs), and never overwrites an existing Status. Copy to
+# .github/workflows/board-nightly-sync.yml in the repo that hosts the nightly
+# (org installs: one repo; individual mode A: the single repo).
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch trusted helpers from the platform repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: stbensonimoh/github-board-automation
+          # immutable SHA of a commit containing scripts/; the release step
+          # updates this to the new immutable v1.x.y tag
+          ref: 1ce14669b5b04f730ce437edba660cfb312ca8f1
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      - name: Backfill missing items and blank statuses
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
+          BOARD: ${{ secrets.PROJECT_BOARD_ID }}
+          # space separated, fully qualified owner/repo slugs; setup sets this
+          BOARD_REPOS: ${{ vars.BOARD_REPOS }}
+        run: |
+          set -euo pipefail
+          source scripts/board-lib.sh
+
+          [ -n "$BOARD_REPOS" ] || { echo "BOARD_REPOS is not set: add it as a variable with space separated owner/repo slugs" >&2; exit 1; }
+
+          fields=$(fetch_fields "$BOARD")
+          B=$(printf '%s' "$fields" | opt_id Backlog)
+          P=$(printf '%s' "$fields" | opt_id "In Progress")
+          items=$(fetch_all_items "$BOARD")
+
+          for slug in $BOARD_REPOS; do
+            case "$slug" in */*) ;; *) echo "rejecting bare repo name '$slug': use fully qualified owner/repo" >&2; exit 1 ;; esac
+            echo "syncing $slug"
+            # open issues only: closed issues are never readded
+            while IFS= read -r node; do
+              [ -n "$node" ] || continue
+              write_if_blank "$BOARD" "$fields" "$items" "$node" "$B"
+              echo "backfilled $slug $node"
+            done < <(fetch_all_open_issues "$slug")
+            while IFS= read -r node; do
+              [ -n "$node" ] || continue
+              write_if_blank "$BOARD" "$fields" "$items" "$node" "$P"
+              echo "backfilled $slug $node"
+            done < <(fetch_all_open_prs "$slug")
+          done
+          echo "nightly sync complete"
