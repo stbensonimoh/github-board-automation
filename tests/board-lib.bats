@@ -280,6 +280,16 @@ mock_gh_seq() {
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "1" ]
 }
 
+@test "delete_item and clear_status use inline literal ids" {
+  load_lib
+  mock_response '{"data":{"deleteProjectV2ItemById":{"deletedItemId":"PVTI_x"}}}'
+  delete_item PVT_board0000000 PVTI_itemOne000000
+  grep -q 'deleteProjectV2ItemById(input: { projectId: "PVT_board0000000", itemId: "PVTI_itemOne000000" })' "$MOCKLOG"
+  mock_response '{"data":{"updateProjectV2ItemFieldValue":{"projectV2Item":{"id":"PVTI_x"}}}}'
+  clear_status PVT_board0000000 PVTI_itemOne000000 PVTSSF_lADOstatus00000
+  grep -q 'singleSelectOptionId: null' "$MOCKLOG"
+}
+
 # --- the single home rule -----------------------------------------------------
 
 @test "issues pagination terminates when hasNextPage is true but endCursor is null" {
