@@ -1,0 +1,11 @@
+{
+  "trigger_event": "issues/opened (second org repo)",
+  "item_node_id": "I_kwDOUiyuGc8AAAABSQM8oQ",
+  "status_before": "",
+  "status_after": "Backlog",
+  "run_url": "n/a (event driven, no run URL captured for the web repo's caller)",
+  "first_step_started_at": "n/a",
+  "card_visible_at": "2026-09-20T19:18:02Z",
+  "elapsed_seconds": 20,
+  "note": "the multi repo proof: an issue in e2e-org-web lands on the org board shared with e2e-org-api"
+}

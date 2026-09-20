@@ -1,0 +1,10 @@
+{
+  "trigger_event": "pull_request_target/reopened",
+  "item_node_id": "I_kwDOUiyt5c8AAAABSQKlyw",
+  "status_before": "Todo",
+  "status_after": "In Progress",
+  "run_url": "https://github.com/businessity/e2e-org-api/actions/runs/35531617301",
+  "first_step_started_at": "2026-09-20T19:13:50Z",
+  "card_visible_at": "2026-09-20T19:14:16Z",
+  "elapsed_seconds": 20
+}
