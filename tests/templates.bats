@@ -85,6 +85,7 @@ NIGHTLY="$BATS_TEST_DIRNAME/../.github/workflows/board-nightly-sync-template.yml
   for f in "$NIGHTLY" "$BATS_TEST_DIRNAME/../.github/workflows/board-automation.yml"; do
     grep -q '^concurrency:' "$f" || { echo "missing concurrency in $f"; return 1; }
     grep -q 'group: board-\${{ github.repository }}' "$f" || { echo "wrong group in $f"; return 1; }
+    grep -q 'cancel-in-progress: false' "$f" || { echo "cancel-in-progress must be false in $f"; return 1; }
   done
 }
 
@@ -115,7 +116,21 @@ $block"
   [ "$status" -ne 0 ]
 }
 
+@test "nightly loop fails loud when a PR fetch fails" {
+  block=$(sed -n '/for slug in \$BOARD_REPOS/,/^          done$/p' "$NIGHTLY")
+  stub='set -euo pipefail
+fetch_all_open_issues() { echo I_1; }
+fetch_all_open_prs() { return 1; }
+write_if_blank() { echo "write:$4:$5"; }'
+  run env BOARD_REPOS="o/r" BOARD=b fields=f items=i B=B P=P bash -c "$stub
+$block"
+  [ "$status" -ne 0 ]
+}
+
 @test "nightly pins the helper fetch to the same ref as the reusable workflow" {
-  grep -qE 'ref: [0-9a-f]{40}' "$NIGHTLY"
-  ! grep -q '@main' "$NIGHTLY"
+  nref=$(sed -n 's/^[[:space:]]*ref:[[:space:]]*//p' "$NIGHTLY")
+  rref=$(sed -n 's/^[[:space:]]*ref:[[:space:]]*//p' "$BATS_TEST_DIRNAME/../.github/workflows/board-automation.yml")
+  [ "$nref" = "$rref" ] || { echo "refs differ: nightly '$nref' vs reusable '$rref'"; return 1; }
+  [[ "$nref" =~ ^([0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "ref '$nref' is not an immutable SHA or vX.Y.Z tag"; return 1; }
+  run ! grep -q '@main' "$NIGHTLY"
 }
