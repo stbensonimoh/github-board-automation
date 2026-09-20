@@ -311,7 +311,7 @@ main() {
   # the runtime token travels by stdin and is never echoed or logged; cat
   # handles both a piped token (no trailing newline) and a hidden TTY paste
   if [ -t 0 ]; then
-    printf 'paste the fine grained PAT (input hidden): ' >&2
+    printf 'paste the PAT (input hidden; user boards need a classic PAT with project and repo scopes): ' >&2
     read -rs token
   else
     token=$(cat)

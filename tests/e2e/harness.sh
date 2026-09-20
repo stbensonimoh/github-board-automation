@@ -13,7 +13,12 @@
 #   reset      close the test issues and PRs and delete only their board items
 #
 # Environment:
-#   E2E_TOKEN            the fine grained PAT; piped to setup.sh, never echoed
+#   E2E_TOKEN            the PAT; piped to setup.sh, never echoed. For the
+#                        user board configs a classic PAT with project and
+#                        repo scopes is required (fine grained PATs cannot
+#                        access user owned projects). For the org config a
+#                        fine grained PAT with Organization Projects read
+#                        and write works
 #   E2E_REPOS            space separated throwaway repo slugs (one for
 #                        individual configs, several for the org config)
 #   E2E_OWNER            the board owner (user login or org login)
