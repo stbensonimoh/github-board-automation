@@ -16,20 +16,20 @@
               {
                 "id": "id_todo",
                 "name": "Todo",
-                "color": "GRAY",
-                "description": ""
+                "color": "GREEN",
+                "description": "ready to start"
               },
               {
                 "id": "id_inprogress",
                 "name": "In Progress",
-                "color": "GRAY",
+                "color": "YELLOW",
                 "description": ""
               },
               {
                 "id": "id_done",
                 "name": "Done",
-                "color": "GRAY",
-                "description": ""
+                "color": "BLUE",
+                "description": "shipped"
               }
             ]
           }

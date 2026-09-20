@@ -110,13 +110,53 @@ mock_gh_board() {
   local mutation
   mutation=$(grep 'updateProjectV2Field' "$MOCKLOG" | tail -1)
   [ -n "$mutation" ]
-  # every existing option is echoed back by name
+  # every existing option is echoed back by name WITH its id, color, and
+  # description, so GitHub preserves option identity and item field values
   local name
   for name in Todo "In Progress" Done Backlog "In Review"; do
     [[ "$mutation" == *"$name"* ]] || { echo "mutation missing option: $name"; return 1; }
   done
+  for id in id_todo id_inprogress id_done; do
+    [[ "$mutation" == *"$id"* ]] || { echo "mutation dropped existing option id: $id"; return 1; }
+  done
+  [[ "$mutation" == *'ready to start'* ]] || { echo "description lost"; return 1; }
+  [[ "$mutation" == *'"color":"GREEN"'* ]] || { echo "color lost"; return 1; }
   # the field id is an inline literal
   [[ "$mutation" == *'fieldId: "PVTSSF_lADOstatus00000"'* ]]
+}
+
+@test "--repos accepts multiple slugs and rejects bare names" {
+  mock_gh_board
+  run bash "$SETUP" --owner some-user --project-number 1 --repos some-user/repo org-owner/other --dry-run
+  [ "$status" -eq 0 ]
+  run bash "$SETUP" --owner some-user --project-number 1 --repos bare-repo --dry-run
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"bare-repo"* ]]
+}
+
+@test "a null board id fails fast naming the owner and number" {
+  mock_gh_board
+  # simulate a mistyped project number: projectV2 is null
+  gh() {
+    local jq_expr="" a prev="" out
+    local -a rest=()
+    for a in "$@"; do
+      if [ "$prev" = "--jq" ]; then jq_expr="$a"
+      elif [ "$a" != "--jq" ]; then rest+=("$a")
+      fi
+      prev="$a"
+    done
+    case "${rest[*]}" in
+      *"projectV2"*) out='{"data":{"user":{"projectV2":null}}}' ;;
+      *) out='{"type": "User"}' ;;
+    esac
+    if [ -n "$jq_expr" ]; then printf '%s' "$out" | jq -r "$jq_expr"; else printf '%s' "$out"; fi
+  }
+  export -f gh
+  run bash "$SETUP" --owner some-user --project-number 99 --repos some-user/repo --dry-run
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"some-user"* ]]
+  [[ "$output" == *"99"* ]]
 }
 
 @test "missing required options fail naming them" {

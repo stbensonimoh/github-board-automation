@@ -36,7 +36,15 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --owner) OWNER="$2"; shift 2 ;;
     --project-number) PROJECT_NUMBER="$2"; shift 2 ;;
-    --repos) REPOS="$2"; shift 2 ;;
+    --repos)
+      shift
+      [ $# -gt 0 ] || { echo "--repos needs at least one OWNER/REPO slug" >&2; exit 1; }
+      while [ $# -gt 0 ] && [[ ! "$1" == --* ]]; do
+        case "$1" in */*) REPOS="${REPOS:+$REPOS }$1" ;;
+          *) echo "rejecting '$1': repos must be fully qualified OWNER/REPO slugs" >&2; exit 1 ;;
+        esac
+        shift
+      done ;;
     --token-expiry) TOKEN_EXPIRY="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h) printf '%s\n' "$USAGE"; exit 0 ;;
@@ -49,7 +57,7 @@ done
 [ -n "$REPOS" ] || { echo "--repos is required (space separated OWNER/REPO slugs)" >&2; printf '%s\n' "$USAGE" >&2; exit 1; }
 
 if [ -n "$TOKEN_EXPIRY" ]; then
-  echo "token expiry: $TOKEN_EXPIRY — add a calendar reminder before this date to rotate the PAT"
+  echo "token expiry: $TOKEN_EXPIRY - add a calendar reminder before this date to rotate the PAT"
 fi
 
 # setup auth: the invoking user's gh auth only, never the runtime token
@@ -115,11 +123,14 @@ ensure_status_options() {
   fi
 
   fid=$(printf '%s' "$fields" | field_id Status)
-  # every existing option echoed back unchanged (ids never sent), then the
-  # missing optional options appended
+  # every existing option echoed back unchanged WITH its id: the schema docs
+  # say option identity and existing item field values are only preserved
+  # when the id is included. New options are submitted without ids. The ids
+  # stay transient; they are never stored.
   options_json=$(printf '%s' "$fields" | jq -c '
     [.data.node.fields.nodes[] | select(.name == "Status") | .options[]
-      | {name, color: (.color // "GRAY"), description: (.description // "")}]')
+      | ({name, color: (.color // "GRAY"), description: (.description // "")}
+         + (if .id then {id} else {} end))]')
   for name in "${need[@]}"; do
     options_json=$(jq -c --arg n "$name" '. + [{name: $n, color: "GRAY", description: ""}]' <<<"$options_json")
   done
@@ -134,7 +145,7 @@ ensure_status_options() {
 # point at the project settings UI; the install docs carry the manual step.
 check_item_closed_workflow() {
   local workflows="$1" enabled
-  enabled=$(printf '%s' "$workflows" | jq -r '.data.node.workflows.nodes[] | select(.name == "Item closed") | .enabled' | head -1)
+  enabled=$(printf '%s' "$workflows" | jq -r 'first(.data.node.workflows.nodes[] | select(.name == "Item closed") | .enabled) // empty')
   if [ -z "$enabled" ]; then
     echo "no 'Item closed' workflow found on this board; check the project settings" >&2
     return 1
@@ -155,6 +166,10 @@ main() {
 
   local board fields workflows
   board=$(resolve_board_id "$OWNER" "$PROJECT_NUMBER")
+  if [ -z "$board" ] || [ "$board" = "null" ]; then
+    echo "no project #$PROJECT_NUMBER found for $OWNER: check the owner login and the project number" >&2
+    exit 1
+  fi
   echo "board: $board"
 
   fields=$(fetch_fields "$board")
