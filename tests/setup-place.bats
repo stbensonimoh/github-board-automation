@@ -38,6 +38,22 @@ mock_gh_full() {
       prev="$a"
     done
     case "${rest[*]}" in
+      *"contents/"*)
+        # a PUT marks the path as existing (a marker file, not log grepping);
+        # a later GET for a marked path returns the sha, an unmarked one 404s.
+        # the marker keys on the path after contents/ so the GET and the PUT
+        # of the same file compute the same name
+        marker="$BATS_TEST_TMPDIR/put-$(printf '%s' "${rest[*]}" | sed 's|.*contents/||; s| -f .*||' | cksum | cut -d' ' -f1)"
+        if printf '%s' "${rest[*]}" | grep -q -- "--method PUT"; then
+          mkdir -p "$BATS_TEST_TMPDIR/puts"
+          touch "$marker"
+          out='{"content":{"path":"emitted"}}'
+        elif [ -f "$marker" ]; then
+          out='{"sha":"existing_sha_123","content":{}}'
+        else
+          out='{"message":"Not Found"}'
+        fi
+        ;;
       *"updateProjectV2Field"* | *"updateProjectV2ItemFieldValue"* | *"addProjectV2ItemById"*)
         out='{"data":{"updateProjectV2Field":{"projectV2Field":{"options":[]}}}}'
         ;;
@@ -55,21 +71,11 @@ mock_gh_full() {
       *"secret set"* | *"variable set"*)
         out=''
         ;;
-      *"contents/"*)
-        # a PUT marks the path as existing (a marker file, not log grepping);
-        # a later GET for a marked path returns the sha, an unmarked one 404s.
-        # the marker keys on the path after contents/ so the GET and the PUT
-        # of the same file compute the same name
-        marker="$BATS_TEST_TMPDIR/put-$(printf '%s' "${rest[*]}" | sed 's|.*contents/||; s| -f .*||' | cksum | cut -d' ' -f1)"
-        if printf '%s' "${rest[*]}" | grep -q -- "--method PUT"; then
-          mkdir -p "$BATS_TEST_TMPDIR/puts"
-          touch "$marker"
-          out='{"content":{"path":"emitted"}}'
-        elif [ -f "$marker" ]; then
-          out='{"sha":"existing_sha_123","content":{}}'
-        else
-          out='{"message":"Not Found"}'
-        fi
+      *"orgs/"*)
+        out=$(cat "$FIXTURES/org-plan-${ORG_PLAN:-free}.json")
+        ;;
+      *"repos/"*)
+        out=$(cat "$FIXTURES/${REPO_VISIBILITY:-repo-private}.json")
         ;;
       *"workflows"*)
         out=$(cat "$FIXTURES/$WF_FIXTURE")
@@ -113,6 +119,9 @@ run_setup() {
 }
 
 @test "org install places org secrets, org variable, and callers in every repo" {
+  # a paid org keeps the org scope default; the free plan plus private repos
+  # flips to repo scope (the dedicated tests below)
+  export ORG_PLAN="team"
   mock_gh_full
   run_setup --owner org-owner --project-number 1 --repos "org-owner/api org-owner/web"
   [ "$status" -eq 0 ]
@@ -199,6 +208,43 @@ run_setup() {
   [ "$status" -eq 0 ]
   run ! grep -q 'secret set' "$MOCKLOG"
   run ! grep -q 'contents/' "$MOCKLOG"
+}
+
+@test "org with a private repo on the free plan defaults to repo scope secrets" {
+  mock_gh_full
+  export ORG_PLAN="free" REPO_VISIBILITY="repo-private"
+  run_setup --owner org-owner --project-number 1 --repos "org-owner/api" --token-expiry 2027-03-01
+  [ "$status" -eq 0 ]
+  grep -q 'secret set PROJECT_AUTOMATION_TOKEN --repo org-owner/api' "$MOCKLOG"
+  grep -q 'variable set BOARD_REPOS --repo org-owner/api' "$MOCKLOG"
+  run ! grep -q -- '--org org-owner' "$MOCKLOG"
+}
+
+@test "org with all public repos defaults to org scope secrets" {
+  mock_gh_full
+  export ORG_PLAN="free" REPO_VISIBILITY="repo-public"
+  run_setup --owner org-owner --project-number 1 --repos "org-owner/api" --token-expiry 2027-03-01
+  [ "$status" -eq 0 ]
+  grep -q 'secret set PROJECT_AUTOMATION_TOKEN --org org-owner --visibility all' "$MOCKLOG"
+  run ! grep -q -- '--repo org-owner/api' "$MOCKLOG"
+}
+
+@test "org on a paid plan defaults to org scope secrets even with private repos" {
+  mock_gh_full
+  export ORG_PLAN="team" REPO_VISIBILITY="repo-private"
+  run_setup --owner org-owner --project-number 1 --repos "org-owner/api" --token-expiry 2027-03-01
+  [ "$status" -eq 0 ]
+  grep -q 'secret set PROJECT_AUTOMATION_TOKEN --org org-owner --visibility all' "$MOCKLOG"
+  run ! grep -q -- '--repo org-owner/api' "$MOCKLOG"
+}
+
+@test "secret scope flag overrides the plan based auto detection" {
+  mock_gh_full
+  export ORG_PLAN="free" REPO_VISIBILITY="repo-private"
+  run_setup --owner org-owner --project-number 1 --repos "org-owner/api" --token-expiry 2027-03-01 --secret-scope org
+  [ "$status" -eq 0 ]
+  grep -q 'secret set PROJECT_AUTOMATION_TOKEN --org org-owner --visibility all' "$MOCKLOG"
+  run ! grep -q -- '--repo org-owner/api' "$MOCKLOG"
 }
 
 @test "a gh auth without the workflow scope fails with the remedy" {

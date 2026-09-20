@@ -23,7 +23,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 USAGE="usage: setup.sh --owner OWNER --project-number N --repos OWNER/REPO [OWNER/REPO ...]
        [--token-expiry YYYY-MM-DD] [--individual-mode copy|reference]
-       [--platform-repo OWNER/REPO] [--dry-run]
+       [--secret-scope org|repo] [--platform-repo OWNER/REPO] [--dry-run]
 
 one command plus one merged caller file installs the automation on any
 user or org ProjectV2 board. The PAT for the runtime secret is read from
@@ -38,6 +38,7 @@ REPOS=""
 TOKEN_EXPIRY=""
 DRY_RUN=false
 INDIVIDUAL_MODE=""
+SECRET_SCOPE=""
 PLATFORM_REPO="stbensonimoh/github-board-automation"
 
 # Parse and validate arguments. Runs only from main, so the script stays
@@ -58,6 +59,7 @@ parse_args() {
         done ;;
       --token-expiry) TOKEN_EXPIRY="$2"; shift 2 ;;
       --individual-mode) INDIVIDUAL_MODE="$2"; shift 2 ;;
+      --secret-scope) SECRET_SCOPE="$2"; shift 2 ;;
       --platform-repo) PLATFORM_REPO="$2"; shift 2 ;;
       --dry-run) DRY_RUN=true; shift ;;
       --help|-h) printf '%s\n' "$USAGE"; exit 0 ;;
@@ -189,6 +191,28 @@ check_item_closed_workflow() {
 
 # --- part 2: placement and emit -------------------------------------------------
 
+# Decides where the secrets go for org installs. On a free plan, org secrets
+# are not readable by private repos, so any private repo in the list flips
+# the placement to repo scope (setup does the per repo work instead of the
+# user). --secret-scope overrides the auto detection.
+decide_secret_scope() {
+  local plan slug private_found
+  if [ "$KIND" != "Organization" ]; then echo "repo"; return 0; fi
+  case "$SECRET_SCOPE" in
+    org) echo "org"; return 0 ;;
+    repo) echo "repo"; return 0 ;;
+  esac
+  plan=$(gh api "orgs/$OWNER" --jq .plan.name)
+  # the plan value drives the free plan decision via the private repo check:
+  # a free org plus any private repo flips to repo scope below
+  [ "$plan" = "free" ] || { echo "org"; return 0; }
+  for slug in $REPOS; do
+    private_found=$(gh api "repos/$slug" --jq .private)
+    [ "$private_found" = "true" ] && { echo "repo"; return 0; }
+  done
+  echo "org"
+}
+
 # Org installs place org scope secrets and the BOARD_REPOS org variable so
 # every participating repo inherits them with zero per repo work. Individual
 # installs place repo scope in the single repo.
@@ -196,6 +220,18 @@ place_secrets_and_vars() {
   local mode="$1" token="$2" scope_args vis_args
   case "$mode" in
     org)
+      if [ "$SECRET_SCOPE_RESOLVED" = "repo" ]; then
+        # repo scope per slug: private repos on a free org cannot read org
+        # secrets, so setup does the per repo placement instead of the user
+        local slug
+        for slug in $REPOS; do
+          printf '%s' "$token" | gh secret set PROJECT_AUTOMATION_TOKEN --repo "$slug"
+          printf '%s' "$BOARD" | gh secret set PROJECT_BOARD_ID --repo "$slug"
+          printf '%s' "$REPOS" | gh variable set BOARD_REPOS --repo "$slug"
+        done
+        echo "secrets and BOARD_REPOS placed at repo scope in each of: $(echo "$REPOS" | tr '\n' ' ')"
+        return 0
+      fi
       scope_args=(--org "$OWNER")
       # org secrets default to private visibility with no selected repos,
       # which no repo can read; the org wide form is the zero per repo work
@@ -354,6 +390,15 @@ main() {
     token=$(cat)
   fi
   [ -n "$token" ] || { echo "no token on stdin" >&2; exit 1; }
+
+  # the secret scope decision: org mode only; repo scope is the only option
+  # for individuals. The auto detection reads the org plan and the repos'
+  # visibility; --secret-scope overrides it.
+  case "$mode" in
+    org) SECRET_SCOPE_RESOLVED=$(decide_secret_scope) ;;
+    *) SECRET_SCOPE_RESOLVED="repo" ;;
+  esac
+  echo "secret scope: $SECRET_SCOPE_RESOLVED"
 
   place_secrets_and_vars "$mode" "$token"
   emit_callers "$mode"
