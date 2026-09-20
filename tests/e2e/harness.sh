@@ -36,7 +36,9 @@ set -euo pipefail
 
 HARNESS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 export PLATFORM_REPO="${E2E_PLATFORM:-stbensonimoh/github-board-automation}"
-EVIDENCE_DIR="${EVIDENCE_DIR:-$HARNESS_DIR/evidence}"
+# evidence lands under evidence/<config>/; E2E_CONFIG names the matrix
+# configuration (private, public, org)
+EVIDENCE_DIR="${EVIDENCE_DIR:-$HARNESS_DIR/evidence}/${E2E_CONFIG:-default}"
 POLL_INTERVAL="${POLL_INTERVAL:-5}"
 FIRST_CARD_BUDGET=90
 DONE_BUDGET=60
@@ -96,6 +98,7 @@ await_status() {
 
 evidence() {
   # evidence FILE TRIGGER_NODE BEFORE AFTER RUN_URL FIRST_STEP ELAPSED
+  mkdir -p "$(dirname "$1")"
   jq -n \
     --arg trigger_event "$2" --arg item_node_id "$3" \
     --arg status_before "$4" --arg status_after "$5" \
