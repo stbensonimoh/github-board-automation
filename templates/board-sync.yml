@@ -1,10 +1,9 @@
 name: Board sync
 
-# Thin per repo caller: maps the triggering event into the shared reusable
-# workflow, which owns all board status transitions. Copy to
-# .github/workflows/board-sync.yml. Individual and cross owner callers MUST
-# map both secrets explicitly (as here); same org callers MAY use
-# `secrets: inherit` instead.
+# Thin per repo caller; setup copies this template to
+# .github/workflows/board-sync.yml (templates live outside that directory so
+# GitHub does not run them). Individual and cross owner callers MUST map both
+# secrets explicitly (as here); same org callers MAY use `secrets: inherit`.
 
 on:
   issues:

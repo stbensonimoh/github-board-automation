@@ -19,9 +19,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # templates are workflows in waiting; lint them with the live ones
           docker run --rm -v "$PWD":/repo -w /repo \
             rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
-            -color
+            -color templates/*.yml
 
       - name: Run shellcheck (pinned image digest)
         shell: bash

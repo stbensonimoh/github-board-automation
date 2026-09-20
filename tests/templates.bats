@@ -4,8 +4,8 @@
 # UX. These tests lock the SPEC pinned contract: triggers, dispatch inputs,
 # explicit secrets, the 40 line cap, and the nightly's variable handling.
 
-SYNC="$BATS_TEST_DIRNAME/../.github/workflows/board-sync-template.yml"
-NIGHTLY="$BATS_TEST_DIRNAME/../.github/workflows/board-nightly-sync-template.yml"
+SYNC="$BATS_TEST_DIRNAME/../templates/board-sync.yml"
+NIGHTLY="$BATS_TEST_DIRNAME/../templates/board-nightly-sync.yml"
 
 @test "caller is at most 40 lines" {
   [ "$(wc -l < "$SYNC" | tr -d ' ')" -le 40 ]

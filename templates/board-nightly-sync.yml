@@ -3,7 +3,8 @@ name: Board nightly sync
 # Safety net: daily backfill for anything the event driven automation missed
 # (token expiry, outages, missed events). Adds open issues and PRs that are
 # missing from the board, fills blank statuses (Backlog for issues, In
-# Progress for PRs), and never overwrites an existing Status. Copy to
+# Progress for PRs), and never overwrites an existing Status. TEMPLATE:
+# stored outside .github/workflows/ on purpose; setup copies it to
 # .github/workflows/board-nightly-sync.yml in the repo that hosts the nightly
 # (org installs: one repo; individual mode A: the single repo).
 
