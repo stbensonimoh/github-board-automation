@@ -1,10 +1,10 @@
 {
   "trigger_event": "pull_request_review/submitted",
-  "item_node_id": "I_kwDOUiyt5c8AAAABSQKlyw",
+  "item_node_id": "I_kwDOUiyt5c8AAAABSQhUdw",
   "status_before": "In Review",
   "status_after": "In Progress",
-  "run_url": "https://github.com/businessity/e2e-org-api/actions/runs/35531545732",
-  "first_step_started_at": "2026-09-20T19:12:33Z",
-  "card_visible_at": "2026-09-20T19:12:54Z",
-  "elapsed_seconds": 16
+  "run_url": "https://github.com/businessity/e2e-org-api/actions/runs/35535341622",
+  "first_step_started_at": "2026-09-20T20:22:33Z",
+  "card_visible_at": "2026-09-20T20:23:01Z",
+  "elapsed_seconds": 23
 }

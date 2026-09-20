@@ -1,10 +1,10 @@
 {
   "trigger_event": "issues/opened",
-  "item_node_id": "I_kwDOUiyt5c8AAAABSQKlyw",
+  "item_node_id": "I_kwDOUiyt5c8AAAABSQhUdw",
   "status_before": "",
   "status_after": "Backlog",
-  "run_url": "https://github.com/businessity/e2e-org-api/actions/runs/35531395263",
-  "first_step_started_at": "2026-09-20T19:09:54Z",
-  "card_visible_at": "2026-09-20T19:10:16Z",
-  "elapsed_seconds": 21
+  "run_url": "https://github.com/businessity/e2e-org-api/actions/runs/35535223625",
+  "first_step_started_at": "2026-09-20T20:20:24Z",
+  "card_visible_at": "2026-09-20T20:20:37Z",
+  "elapsed_seconds": 12
 }
