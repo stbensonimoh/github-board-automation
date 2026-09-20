@@ -9,8 +9,9 @@ name: Board automation (reusable)
 #   review requested       -> In Review (+ linked issues)
 #   changes requested      -> In Progress (+ linked issues)
 #   review submitted, other state -> no-op (approved or commented never move a card)
-#   PR closed unmerged     -> linked issues to Todo, unless another open PR in
-#                             this repo still closes them
+#   PR closed unmerged     -> linked issues that are still open to Todo,
+#                             unless another open PR in this repo still
+#                             closes them; closed issues keep their card
 #   PR merged              -> nothing (the merge closes issues; the board's
 #                             Item closed workflow moves cards to Done)
 #
@@ -127,7 +128,7 @@ jobs:
           # close without merge: linked issues go back to Todo unless another
           # open PR in this repo still closes them
           revert_linked_issues_to_todo() {
-            local n pr_num pr_body found prs linked node
+            local n pr_num pr_body found prs linked issue issue_state
             prs=$(fetch_all_open_prs_jsonl "$REPO")
             linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
             while IFS= read -r n; do
@@ -147,7 +148,8 @@ jobs:
                 issue=$(gh api "repos/$REPO/issues/$n") || { echo "failed to resolve issue #$n" >&2; exit 1; }
                 # an issue that is already closed keeps its card; only open
                 # issues return to Todo (a merged sibling PR may have closed it)
-                [ "$(jq -r .state <<<"$issue")" = "open" ] || continue
+                issue_state=$(jq -r .state <<<"$issue") || { echo "failed to parse issue #$n" >&2; exit 1; }
+                [ "$issue_state" = "open" ] || continue
                 set_item_status "$(jq -r .node_id <<<"$issue")" "$T"
               fi
             done <<< "$linked"

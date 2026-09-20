@@ -94,6 +94,10 @@ run_mapping() {
   [ "$(printf '%s' "$output" | sed -n 5p)" = "opt:In Review" ]
 }
 
+extract_revert() {
+  sed -n '/^          revert_linked_issues_to_todo() {$/,/^          }$/p' "$YML"
+}
+
 @test "revert skips linked issues that are already closed" {
   {
     echo 'set -euo pipefail'
