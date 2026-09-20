@@ -400,6 +400,14 @@ nightly_test() {
   dispatch "issues" "reopened" "$num_a" "$node_a"
   run_then_status "$node_a" "Todo" "$FIRST_CARD_BUDGET" "$before" > /dev/null
 
+  # the shared concurrency group cancels a QUEUED run when a newer one
+  # arrives: B's opened run queued behind A's and was cancelled by the
+  # reopen dispatch, so B's card may not exist. Re-trigger if missing.
+  if [ -z "$(card_status "$node_b" || true)" ]; then
+    dispatch "issues" "opened" "$num_b" "$node_b"
+    run_then_status "$node_b" "Backlog" "$FIRST_CARD_BUDGET" "$before" > /dev/null
+  fi
+
   items=$(fetch_all_items "$BOARD")
   line_a=$(item_line "$items" "$node_a")
   line_b=$(item_line "$items" "$node_b")

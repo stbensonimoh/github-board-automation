@@ -1,10 +1,10 @@
 {
   "trigger_event": "issues/reopened",
-  "item_node_id": "I_kwDOUijd-M8AAAABSPuGQQ",
+  "item_node_id": "I_kwDOUijd-M8AAAABSPwhAw",
   "status_before": "Backlog",
   "status_after": "Todo",
-  "run_url": "https://github.com/stbensonimoh/e2e-board-private/actions/runs/35526517210",
-  "first_step_started_at": "2026-09-20T17:38:37Z",
-  "card_visible_at": "2026-09-20T17:38:54Z",
-  "elapsed_seconds": 16
+  "run_url": "https://github.com/stbensonimoh/e2e-board-private/actions/runs/35526902709",
+  "first_step_started_at": "2026-09-20T17:45:58Z",
+  "card_visible_at": "2026-09-20T17:46:14Z",
+  "elapsed_seconds": 15
 }
