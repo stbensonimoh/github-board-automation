@@ -116,7 +116,7 @@ jobs:
           link_linked_issues() {
             local n linked
             linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
-            local n node
+            local node
             while IFS= read -r n; do
               [ -n "$n" ] || continue
               node=$(gh api "repos/$REPO/issues/$n" --jq '.node_id') || { echo "failed to resolve issue #$n" >&2; exit 1; }
@@ -127,7 +127,7 @@ jobs:
           # close without merge: linked issues go back to Todo unless another
           # open PR in this repo still closes them
           revert_linked_issues_to_todo() {
-            local n pr_num pr_body found prs linked
+            local n pr_num pr_body found prs linked node
             prs=$(fetch_all_open_prs_jsonl "$REPO")
             linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
             while IFS= read -r n; do
