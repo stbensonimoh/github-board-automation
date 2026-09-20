@@ -491,7 +491,7 @@ provision() {
 # --- main -----------------------------------------------------------------------
 
 usage() {
-  echo "usage: harness.sh provision|checks|nightly|reset"
+  echo "usage: harness.sh provision|checks|nightly|reset|all"
   echo "  provision  create the throwaway board and run setup.sh (needs E2E_TOKEN,"
   echo "             E2E_OWNER, E2E_REPOS, E2E_TOKEN_EXPIRY)"
   echo "  checks     the eight checks plus the no-op (needs E2E_REPO + E2E_PROJECT_ID)"
