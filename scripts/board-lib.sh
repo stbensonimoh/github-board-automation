@@ -25,7 +25,7 @@ fetch_fields() {
       node(id: $project) { ... on ProjectV2 { fields(first: 50) {
         nodes {
           ... on ProjectV2Field { id name }
-          ... on ProjectV2SingleSelectField { id name options { id name color } }
+          ... on ProjectV2SingleSelectField { id name options { id name color description } }
         }
       } } }
     }' -f project="$1"

@@ -1,0 +1,18 @@
+{
+  "data": {
+    "node": {
+      "workflows": {
+        "nodes": [
+          {
+            "name": "Item closed",
+            "enabled": false
+          },
+          {
+            "name": "Item added to project",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  }
+}
