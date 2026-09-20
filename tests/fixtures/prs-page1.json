@@ -1,0 +1,13 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "nodes": [
+          { "id": "PR_pullNode0000009", "number": 4, "state": "OPEN" },
+          { "id": "PR_pullNode0000010", "number": 5, "state": "OPEN" }
+        ],
+        "pageInfo": { "hasNextPage": false, "endCursor": null }
+      }
+    }
+  }
+}

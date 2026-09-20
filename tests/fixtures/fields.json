@@ -1,0 +1,23 @@
+{
+  "data": {
+    "node": {
+      "fields": {
+        "nodes": [
+          { "__typename": "ProjectV2Field", "id": "PVTF_lADOtitle0000000", "name": "Title" },
+          {
+            "__typename": "ProjectV2SingleSelectField",
+            "id": "PVTSSF_lADOstatus00000",
+            "name": "Status",
+            "options": [
+              { "id": "0a6e581e", "name": "Backlog", "color": "GRAY" },
+              { "id": "f75ad846", "name": "Todo", "color": "GREEN" },
+              { "id": "47fc9ee4", "name": "In Progress", "color": "YELLOW" },
+              { "id": "f4b3cd98", "name": "In Review", "color": "PURPLE" },
+              { "id": "98236657", "name": "Done", "color": "BLUE" }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
