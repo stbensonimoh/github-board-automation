@@ -83,16 +83,13 @@ run_mapping() {
     echo 'opt_id() { echo "opt:$1"; }'
     echo 'fetch_all_items() { echo "items-json"; }'
     sed -n '/^          fields=\$(fetch_fields "\$BOARD")$/,/^          items=\$(fetch_all_items "\$BOARD")$/p' "$YML"
-    echo 'printf "%s
-%s
-%s
-%s
-" "$STATUS_FIELD" "$B" "$P" "$R"'
+    echo 'printf "%s\n%s\n%s\n%s\n%s\n" "$STATUS_FIELD" "$B" "$T" "$P" "$R"'
   } > "$BATS_TEST_TMPDIR/bindings.sh"
   run env BOARD=BOARD bash "$BATS_TEST_TMPDIR/bindings.sh"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | sed -n 1p)" = "field:Status" ]
   [ "$(printf '%s' "$output" | sed -n 2p)" = "opt:Backlog" ]
-  [ "$(printf '%s' "$output" | sed -n 3p)" = "opt:In Progress" ]
-  [ "$(printf '%s' "$output" | sed -n 4p)" = "opt:In Review" ]
+  [ "$(printf '%s' "$output" | sed -n 3p)" = "opt:Todo" ]
+  [ "$(printf '%s' "$output" | sed -n 4p)" = "opt:In Progress" ]
+  [ "$(printf '%s' "$output" | sed -n 5p)" = "opt:In Review" ]
 }

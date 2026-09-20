@@ -97,6 +97,7 @@ jobs:
           # returns the existing item when the content is already on the board
           item_id_for() {
             local line
+            [ -n "$1" ] || { echo "empty content node id" >&2; return 1; }
             line=$(item_line "$items" "$1")
             if [ -z "$line" ]; then add_item "$BOARD" "$1"; else printf '%s' "${line%%$'\t'*}"; fi
           }
@@ -115,9 +116,11 @@ jobs:
           link_linked_issues() {
             local n linked
             linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
+            local n node
             while IFS= read -r n; do
               [ -n "$n" ] || continue
-              set_item_status "$(gh api "repos/$REPO/issues/$n" --jq '.node_id')" "$1"
+              node=$(gh api "repos/$REPO/issues/$n" --jq '.node_id') || { echo "failed to resolve issue #$n" >&2; exit 1; }
+              set_item_status "$node" "$1"
             done <<< "$linked"
           }
 
@@ -140,7 +143,10 @@ jobs:
                   break
                 fi
               done <<< "$prs"
-              [ "$found" = "true" ] || set_item_status "$(gh api "repos/$REPO/issues/$n" --jq '.node_id')" "$T"
+              if [ "$found" != "true" ]; then
+                node=$(gh api "repos/$REPO/issues/$n" --jq '.node_id') || { echo "failed to resolve issue #$n" >&2; exit 1; }
+                set_item_status "$node" "$T"
+              fi
             done <<< "$linked"
           }
 
