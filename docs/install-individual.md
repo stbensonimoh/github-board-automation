@@ -22,6 +22,9 @@ about a minute once you have the pieces below.
    - Expiration: pick a date and write it down
    - Tick the checkbox called `repo` and the one called `project`
    - Generate the token and copy it (it starts with `ghp_`)
+5. **A `Blocked` label** in your repo. The board has no Blocked column.
+   Track blocked work with this label. To create it, open your repo's Issues
+   tab, click Labels, then New label, and name it `Blocked`.
 
 The newer fine-grained tokens cannot reach personal boards; GitHub says so on
 their token page. Use the classic kind for this.

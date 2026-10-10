@@ -26,6 +26,9 @@ repos. Setup takes about a minute once you have the pieces below.
      Read-only. The placed token never writes issues; it only reads them.
    - Expiration: pick a date and write it down
    - Generate the token and copy it (it starts with `github_pat_`)
+5. **A `Blocked` label** in each repo. The board has no Blocked column.
+   Track blocked work with this label. To create it, open the repo's Issues
+   tab, click Labels, then New label, and name it `Blocked`.
 
 ## Run one command
 
