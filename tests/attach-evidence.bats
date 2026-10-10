@@ -42,6 +42,7 @@ write_evidence() {
   mkdir -p "$EVIDENCE_DIR/private"
   printf '{"trigger_event":"issues/opened"}\n' > "$EVIDENCE_DIR/private/check1-open-issue.json"
   printf '{"trigger_event":"pull_request_target/opened"}\n' > "$EVIDENCE_DIR/private/check3-open-pr.json"
+  printf 'not evidence\n' > "$EVIDENCE_DIR/private/decoy.txt"
 }
 
 @test "missing tag fails with usage" {
@@ -77,21 +78,36 @@ write_evidence() {
 @test "success uploads exactly one dated snapshot for the release" {
   mock_gh
   write_evidence
+  # point mktemp at a watched dir so the EXIT trap is observable
+  export TMPDIR="$BATS_TEST_TMPDIR/stage"
+  mkdir -p "$TMPDIR"
   run bash "$ATTACH" v1.2.0
   [ "$status" -eq 0 ]
   [ "$(grep -c . "$MOCKLOG")" -eq 1 ]
   [ "$(grep -c '\.tar\.gz' "$MOCKLOG")" -eq 1 ]
   grep -Eq '^release upload v1\.2\.0 .*/evidence-snapshot-v1\.2\.0-[0-9]{4}-[0-9]{2}-[0-9]{2}\.tar\.gz --clobber$' "$MOCKLOG"
   grep -q "evidence-snapshot-v1.2.0-$(date -u +%Y-%m-%d).tar.gz" "$MOCKLOG"
+  # the staging dir mktemp made is removed on exit: nothing left behind
+  [ -z "$(ls -A "$TMPDIR")" ]
 }
 
-@test "snapshot tarball carries the nested evidence JSONs" {
+@test "snapshot tarball carries only the JSON evidence with relative entry paths" {
   mock_gh
   write_evidence
   run bash "$ATTACH" v1.2.0
   [ "$status" -eq 0 ]
-  grep -q 'private/check1-open-issue.json' "$TARLOG"
-  grep -q 'private/check3-open-pr.json' "$TARLOG"
+  [ "$(grep -c . "$TARLOG")" -eq 2 ]
+  grep -qx './private/check1-open-issue.json' "$TARLOG"
+  grep -qx './private/check3-open-pr.json' "$TARLOG"
+  run ! grep -q 'decoy.txt' "$TARLOG"
+}
+
+@test "slash tag is sanitized in the asset name and passed whole to gh" {
+  mock_gh
+  write_evidence
+  run bash "$ATTACH" release/v1.0
+  [ "$status" -eq 0 ]
+  grep -Eq '^release upload release/v1\.0 .*/evidence-snapshot-release-v1\.0-[0-9]{4}-[0-9]{2}-[0-9]{2}\.tar\.gz --clobber$' "$MOCKLOG"
 }
 
 @test "success message names the asset and the release" {
