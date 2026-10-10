@@ -153,8 +153,9 @@ extract_revert() {
     echo 'linked_issue_numbers() { printf "12\n"; }'
     # a small body never trips the old grep -qx race: the parser must keep
     # writing refs after grep -qx exits and the printf writer must still be
-    # mid-write, so the ref repeats past the 64 KiB pipe buffer
-    echo "fetch_all_open_prs_jsonl() { printf \"Closes #12 \\n%.0s\" {1..12001} | jq -Rsc '{number: 9, body: .}'; }"
+    # mid-write, so the ref repeats 25000 times and the parser output passes
+    # the 64 KiB pipe buffer
+    echo "fetch_all_open_prs_jsonl() { printf \"Closes #12 \\n%.0s\" {1..25000} | jq -Rsc '{number: 9, body: .}'; }"
     # PR 9 still closes issue 12: found stays true and gh is never called
     echo 'gh() { printf "%s" "{\"state\": \"open\", \"node_id\": \"NODE_OPEN\"}"; }'
     echo 'set_item_status() { echo "MOVED:$1"; }'
