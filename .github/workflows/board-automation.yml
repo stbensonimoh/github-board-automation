@@ -66,7 +66,7 @@ jobs:
           repository: stbensonimoh/github-board-automation
           # immutable v1.x.y tag per the SPEC release policy; the release
           # step moves this with every release
-          ref: v1.1.0
+          ref: v1.2.0
           sparse-checkout: scripts
           persist-credentials: false
 
