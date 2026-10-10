@@ -69,6 +69,11 @@ mock_gh_full() {
         fi
         ;;
       *"secret set"* | *"variable set"*)
+        # the real gh reads the value from stdin; drain a piped stdin before
+        # exiting, or the writer races the exit and dies of SIGPIPE under
+        # pipefail. A non pipe stdin (/dev/null, a file) never races, and
+        # draining it could block, so only pipes are read.
+        if [ -p /dev/stdin ]; then cat >/dev/null; fi
         out=''
         ;;
       *"orgs/"*)
