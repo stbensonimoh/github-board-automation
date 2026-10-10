@@ -147,6 +147,10 @@ Images are pinned by digest so local runs match CI exactly. CI runs the same
 three checks on every PR. `SPEC.md` is the full spec; docs/ carries the
 install guides and troubleshooting.
 
+E2E evidence files do not get committed. The harness writes them under
+`tests/e2e/evidence/`, and that directory is ignored by git. When a PR claims
+an E2E pass, attach the Actions run URL and the JSON to the PR.
+
 ## More detail
 
 - docs/install-org.md: the org walkthrough
