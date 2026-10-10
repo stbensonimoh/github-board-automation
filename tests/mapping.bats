@@ -79,8 +79,12 @@ run_mapping() {
   {
     echo 'set -euo pipefail'
     echo 'fetch_fields() { echo "fields-json"; }'
-    echo 'field_id() { echo "field:$1"; }'
-    echo 'opt_id() { echo "opt:$1"; }'
+    # the real field_id and opt_id read stdin (jq); a stub that exits without
+    # reading lets the printf writer lose the pipe race and die of SIGPIPE
+    # (141), which the pipefail above turns into a flaky test failure. Drain
+    # stdin like the real consumers do.
+    echo 'field_id() { cat >/dev/null; echo "field:$1"; }'
+    echo 'opt_id() { cat >/dev/null; echo "opt:$1"; }'
     echo 'fetch_all_items() { echo "items-json"; }'
     sed -n '/^          fields=\$(fetch_fields "\$BOARD")$/,/^          items=\$(fetch_all_items "\$BOARD")$/p' "$YML"
     echo 'printf "%s\n%s\n%s\n%s\n%s\n" "$STATUS_FIELD" "$B" "$T" "$P" "$R"'

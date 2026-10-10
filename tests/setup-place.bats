@@ -44,7 +44,11 @@ mock_gh_full() {
         # the marker keys on the path after contents/ so the GET and the PUT
         # of the same file compute the same name
         marker="$BATS_TEST_TMPDIR/put-$(printf '%s' "${rest[*]}" | sed 's|.*contents/||; s| -f .*||' | cksum | cut -d' ' -f1)"
-        if printf '%s' "${rest[*]}" | grep -q -- "--method PUT"; then
+        # shell pattern match, not `printf | grep -q`: grep exits on the
+        # first match while printf may still be writing, and under setup's
+        # pipefail the dead writer (141) flips this branch to the wrong
+        # fixture. Matching in the shell removes the pipe entirely.
+        if [[ "${rest[*]}" == *"--method PUT"* ]]; then
           mkdir -p "$BATS_TEST_TMPDIR/puts"
           touch "$marker"
           out='{"content":{"path":"emitted"}}'
@@ -62,7 +66,7 @@ mock_gh_full() {
         out=$(cat "$FIXTURES/${FIELDS_FIXTURE:-fields-five.json}")
         ;;
       *"projectV2"*)
-        if printf '%s' "${rest[*]}" | grep -q 'organization('; then
+        if [[ "${rest[*]}" == *"organization("* ]]; then
           out=$(cat "$FIXTURES/board-org.json")
         else
           out=$(cat "$FIXTURES/board-user.json")
@@ -180,7 +184,9 @@ run_setup() {
   # first PUT creates (no sha known); the mock answers GETs with 404 until then
   put_file some-user/repo .github/workflows/board-sync.yml "content" "msg"
   local first
-  first=$(grep 'method PUT.*board-sync.yml' "$MOCKLOG" | head -1)
+  # grep -m1 stops itself after the first match; `grep | head -1` lets head
+  # exit early and SIGPIPE grep, which the sourced pipefail reports as 141
+  first=$(grep -m1 'method PUT.*board-sync.yml' "$MOCKLOG")
   [[ "$first" != *'-f sha='* ]] || { echo "created with a sha?"; return 1; }
   # the file now exists: the second PUT must carry the existing sha
   put_file some-user/repo .github/workflows/board-sync.yml "content2" "msg2"
