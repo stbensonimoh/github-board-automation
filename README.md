@@ -152,3 +152,7 @@ install guides and troubleshooting.
 - docs/install-org.md: the org walkthrough
 - docs/install-individual.md: the personal walkthrough, both install styles
 - docs/troubleshooting.md: what to do when something fails
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
