@@ -1,0 +1,3 @@
+# Per run E2E evidence is written by tests/e2e/harness.sh and never committed;
+# SPEC.md requires a dated snapshot on each release: scripts/attach-evidence.sh.
+tests/e2e/evidence/
