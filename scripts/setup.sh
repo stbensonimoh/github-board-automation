@@ -424,6 +424,17 @@ main() {
   fi
   [ -n "$token" ] || { echo "no token on stdin" >&2; exit 1; }
 
+  # fail fast on a malformed paste: a wrong token would otherwise be stored
+  # as a dead secret. ghp_ is the classic PAT prefix, github_pat_ the fine
+  # grained one. The token itself is never echoed.
+  case "$token" in
+    ghp_* | github_pat_*) ;;
+    *)
+      echo "unrecognized token prefix: the runtime PAT must start with ghp_ or github_pat_" >&2
+      echo "create a classic PAT (ghp_) or a fine grained PAT (github_pat_), then rerun setup" >&2
+      exit 1 ;;
+  esac
+
   # the secret scope decision: org mode only; repo scope is the only option
   # for individuals. The auto detection reads the org plan and the repos'
   # visibility; --secret-scope overrides it.

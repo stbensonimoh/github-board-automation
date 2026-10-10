@@ -209,6 +209,27 @@ run_setup() {
   run ! grep -q 'secret set' "$MOCKLOG"
 }
 
+@test "a token with an unrecognized prefix fails fast before any write" {
+  mock_gh_full
+  run bash -c "printf '%s' 'not_a_pat_12345' | bash '$SETUP' --owner some-user --project-number 1 --repos some-user/repo --token-expiry 2027-03-01 --individual-mode copy"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unrecognized token prefix"* ]]
+  [[ "$output" == *"ghp_"* ]]
+  [[ "$output" == *"github_pat_"* ]]
+  # the rejected token is never echoed and no secret or file is written
+  [[ "$output" != *"not_a_pat_12345"* ]]
+  run ! grep -q 'secret set' "$MOCKLOG"
+  run ! grep -q 'contents/' "$MOCKLOG"
+}
+
+@test "a fine grained github_pat_ token is accepted" {
+  mock_gh_full
+  run bash -c "printf '%s' 'github_pat_test_67890' | bash '$SETUP' --owner some-user --project-number 1 --repos some-user/repo --token-expiry 2027-03-01 --individual-mode copy"
+  [ "$status" -eq 0 ]
+  grep -q 'secret set PROJECT_AUTOMATION_TOKEN --repo some-user/repo' "$MOCKLOG"
+  [[ "$output" != *"github_pat_test_67890"* ]]
+}
+
 @test "a dry run without token expiry passes and places nothing" {
   mock_gh_full
   run bash -c "printf '%s' '$TOKEN' | bash '$SETUP' --owner some-user --project-number 1 --repos some-user/repo --individual-mode copy --dry-run"
