@@ -115,6 +115,7 @@ scripts/
   setup.sh                       -> installer: lookup ids, ensure options, check Item-closed workflow, set secrets and vars, emit caller
   parse-linked.sh                -> pure close keyword parser taking PR body on stdin or as argument, no network calls
   board-lib.sh                   -> shared helpers: paginated items query, add item, set Status; sourced by both sync and nightly paths
+  attach-evidence.sh             -> stages a dated evidence snapshot tarball and uploads it to the release
 tests/
   setup.bats                     -> setup script unit tests
   parse.bats                     -> close keyword parser unit tests calling scripts/parse-linked.sh with PR body fixtures
