@@ -117,9 +117,11 @@ resolve_board_id() {
 # option echoed back unchanged (id, name, color, description) and only the
 # missing optional options appended. Identity and existing item field values
 # survive only when each existing option's id is included. Required options
-# that are missing cannot be fixed by a field edit, so that fails loud.
+# that are missing cannot be fixed by a field edit, so that fails loud. The
+# settings URL for that failure arrives as the third argument, so the
+# function reads no globals and stays sourceable on its own.
 ensure_status_options() {
-  local fields="$1" dry_run="$2" name id fid options_gql settings_url
+  local fields="$1" dry_run="$2" settings_url="$3" name id fid options_gql
   local -a need=()
   local -a missing_required=()
   for name in Todo "In Progress" Done; do
@@ -128,13 +130,6 @@ ensure_status_options() {
   done
   if [ ${#missing_required[@]} -gt 0 ]; then
     printf 'missing required Status option(s):%s\n' " ${missing_required[*]}" >&2
-    # the fix is a click away: org and user owned boards have different
-    # settings URL shapes
-    if [ "$KIND" = "Organization" ]; then
-      settings_url="https://github.com/orgs/$OWNER/projects/$PROJECT_NUMBER/settings"
-    else
-      settings_url="https://github.com/users/$OWNER/projects/$PROJECT_NUMBER/settings"
-    fi
     echo "create them in the project settings UI at $settings_url, then rerun setup" >&2
     return 1
   fi
@@ -349,7 +344,7 @@ main() {
   # shellcheck disable=SC1091
   source "$SCRIPT_DIR/board-lib.sh"
 
-  local fields workflows token mode
+  local fields workflows token mode settings_url
   # validate and normalize the repo list: fully qualified slugs only
   local -a slugs=()
   local slug
@@ -373,7 +368,14 @@ main() {
   echo "board: $BOARD"
 
   fields=$(fetch_fields "$BOARD")
-  ensure_status_options "$fields" "$DRY_RUN"
+  # the missing options failure points at the project settings UI; org and
+  # user owned boards have different URL shapes
+  if [ "$KIND" = "Organization" ]; then
+    settings_url="https://github.com/orgs/$OWNER/projects/$PROJECT_NUMBER/settings"
+  else
+    settings_url="https://github.com/users/$OWNER/projects/$PROJECT_NUMBER/settings"
+  fi
+  ensure_status_options "$fields" "$DRY_RUN" "$settings_url"
 
   workflows=$(gh api graphql -f query='
     query($project: ID!) {

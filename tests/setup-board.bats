@@ -207,6 +207,18 @@ SCOPE_HEADER_PREFIX="x-oauth-scopes:"
   [[ "$output" == *"https://github.com/orgs/org-owner/projects/7/settings"* ]]
 }
 
+@test "ensure_status_options is sourceable and takes the settings URL as an argument" {
+  # a direct call has no KIND, OWNER, or PROJECT_NUMBER globals: the URL
+  # must arrive as an argument, and the failure must stay the two pinned
+  # lines. board-lib supplies opt_id, as it does in main.
+  source "$SETUP"
+  source "$BATS_TEST_DIRNAME/../scripts/board-lib.sh"
+  run ensure_status_options "$(cat "$FIXTURES/fields-missing-required.json")" false "https://github.com/users/direct-call/projects/9/settings"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing required Status option(s): In Progress"* ]]
+  [[ "$output" == *"create them in the project settings UI at https://github.com/users/direct-call/projects/9/settings, then rerun setup"* ]]
+}
+
 @test "dry run prints the plan and never mutates" {
   mock_gh_board
   run bash "$SETUP" --owner some-user --project-number 1 --repos some-user/repo --dry-run
