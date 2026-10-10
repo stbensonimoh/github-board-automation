@@ -140,3 +140,29 @@ extract_revert() {
   [ "$status" -eq 0 ]
   [ "$output" = "MOVED:NODE_OPEN" ]
 }
+
+@test "revert keeps linked issues that another open PR still closes" {
+  {
+    echo 'set -euo pipefail'
+    echo 'REPO=octo-org/api'
+    echo 'NUMBER=7'
+    echo 'T=T'
+    # this is the only revert test where the real parser runs on a competing
+    # PR body, so the path is absolute and independent of the test cwd
+    echo "PARSER=$BATS_TEST_DIRNAME/../scripts/parse-linked.sh"
+    echo 'linked_issue_numbers() { printf "12\n"; }'
+    # a small body never trips the old grep -qx race: the parser must keep
+    # writing refs after grep -qx exits and the printf writer must still be
+    # mid-write, so the ref repeats 25000 times and the parser output passes
+    # the 64 KiB pipe buffer
+    echo "fetch_all_open_prs_jsonl() { printf \"Closes #12 \\n%.0s\" {1..25000} | jq -Rsc '{number: 9, body: .}'; }"
+    # PR 9 still closes issue 12: found stays true and gh is never called
+    echo 'gh() { printf "%s" "{\"state\": \"open\", \"node_id\": \"NODE_OPEN\"}"; }'
+    echo 'set_item_status() { echo "MOVED:$1"; }'
+    sed -n '/^          revert_linked_issues_to_todo() {$/,/^          }$/p' "$YML"
+  echo 'revert_linked_issues_to_todo'
+  } > "$BATS_TEST_TMPDIR/revert-competing.sh"
+  run bash "$BATS_TEST_TMPDIR/revert-competing.sh"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}

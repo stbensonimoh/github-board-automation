@@ -147,7 +147,6 @@ run_setup() {
 @test "the token never appears in logs or output" {
   mock_gh_full
   run_setup --owner some-user --project-number 1 --repos some-user/repo --individual-mode copy
-  { echo "STATUS: $status"; printf '%s\n' "$output" | tail -4; } > /tmp/t2-debug.txt
   [ "$status" -eq 0 ]
   run ! grep -q "$TOKEN" "$MOCKLOG"
   [[ "$output" != *"$TOKEN"* ]]

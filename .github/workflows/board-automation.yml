@@ -128,7 +128,7 @@ jobs:
           # close without merge: linked issues go back to Todo unless another
           # open PR in this repo still closes them
           revert_linked_issues_to_todo() {
-            local n pr_num pr_body found prs linked issue issue_state
+            local n pr_num pr_body found prs linked issue issue_state refs
             prs=$(fetch_all_open_prs_jsonl "$REPO")
             linked=$(linked_issue_numbers) || { echo "failed to read linked issues from the PR body" >&2; exit 1; }
             while IFS= read -r n; do
@@ -139,10 +139,18 @@ jobs:
                 pr_num=$(jq -r '.number' <<<"$pr_json")
                 [ "$pr_num" = "$NUMBER" ] && continue
                 pr_body=$(jq -r '.body // ""' <<<"$pr_json")
-                if printf '%s' "$pr_body" | bash "$PARSER" | grep -qx "$n"; then
-                  found=true
-                  break
-                fi
+                # capture the parser output and match in the shell: a grep -q
+                # consumer exits on the first match, the parser pipeline ends
+                # early, and the printf writer still has data in flight and
+                # dies of SIGPIPE; under pipefail the if then silently reads
+                # that as "not closed by another PR"
+                refs=$(printf '%s' "$pr_body" | bash "$PARSER")
+                case $'\n'"$refs"$'\n' in
+                  *$'\n'"$n"$'\n'*)
+                    found=true
+                    break
+                    ;;
+                esac
               done <<< "$prs"
               if [ "$found" != "true" ]; then
                 issue=$(gh api "repos/$REPO/issues/$n") || { echo "failed to resolve issue #$n" >&2; exit 1; }
