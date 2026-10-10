@@ -92,8 +92,12 @@ fetch_all_items() {
 }
 
 # Returns the tsv row for a content node id, or empty when the item is absent.
+# awk must read stdin to EOF: an `exit` on the first match lets awk close the
+# pipe while printf still has output in flight, so the writer dies of SIGPIPE
+# (141) and pipefail propagates that out of every caller (observed as
+# reset_board status 141). The !seen guard keeps the single row contract.
 item_line() {
-  printf '%s\n' "$1" | awk -F'\t' -v n="$2" '$2 == n { print; exit }'
+  printf '%s\n' "$1" | awk -F'\t' -v n="$2" '$2 == n && !seen { print; seen = 1 }'
 }
 
 # --- mutations ----------------------------------------------------------------
