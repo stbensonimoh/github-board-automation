@@ -125,7 +125,7 @@ tests/
   setup-place.bats               -> setup.sh secret and variable placement plus caller emit tests
   templates.bats                 -> template contract tests: triggers, dispatch inputs, 40 line cap, and nightly wiring
   attach-evidence.bats           -> release snapshot helper tests for scripts/attach-evidence.sh
-  fixtures/                      -> sample API responses for boards, fields, items, issues, PRs, plans, and workflows
+  fixtures/                      -> sample API responses for boards, fields, items, issues, PRs, plans, repos, users, and workflows
   e2e/                           -> live harness; writes gitignored run evidence under evidence/
 docs/
   install-org.md                 -> org path with org secrets
