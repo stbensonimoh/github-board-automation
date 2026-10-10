@@ -49,14 +49,18 @@ mock_gh_board() {
         out=$(cat "$FIXTURES/${FIELDS_FIXTURE:-fields-five.json}")
         ;;
       *"projectV2"*)
-        if printf '%s' "${rest[*]}" | grep -q 'organization('; then
+        # shell pattern match, not `printf | grep -q`: grep exits on the
+        # first match while printf may still be writing, and under setup's
+        # pipefail the dead writer (141) flips this branch to the wrong
+        # fixture. Matching in the shell removes the pipe entirely.
+        if [[ "${rest[*]}" == *"organization("* ]]; then
           out=$(cat "$FIXTURES/board-org.json")
         else
           out=$(cat "$FIXTURES/board-user.json")
         fi
         ;;
       *)
-        if printf '%s' "${rest[*]}" | grep -q 'org-owner'; then
+        if [[ "${rest[*]}" == *"org-owner"* ]]; then
           out=$(cat "$FIXTURES/users-org.json")
         else
           out=$(cat "$FIXTURES/users-user.json")

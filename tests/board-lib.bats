@@ -110,7 +110,10 @@ mock_gh_seq() {
   load_lib
   out="$(items_extract < "$FIXTURES/items-page1.json")"
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
-  [ "$(printf '%s' "$out" | head -1)" = "$(printf 'PVTI_itemOne000000\tI_issueNode0000001\tTodo')" ]
+  # sed -n 1p reads its stdin to EOF; head -1 can exit while printf is still
+  # writing, and the pipefail the lib sets on source turns that SIGPIPE into
+  # a flaky 141
+  [ "$(printf '%s' "$out" | sed -n 1p)" = "$(printf 'PVTI_itemOne000000\tI_issueNode0000001\tTodo')" ]
   [ "$(printf '%s' "$out" | sed -n 2p)" = "$(printf 'PVTI_itemTwo000000\tPR_pullNode0000001\t')" ]
 }
 
@@ -360,7 +363,8 @@ mock_gh_seq() {
   load_lib
   out="$(prs_extract_jsonl < "$FIXTURES/prs-bodies-page1.json")"
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "2" ]
-  first="$(printf '%s' "$out" | head -1)"
+  # sed -n 1p drains stdin; head -1 races the printf writer under pipefail
+  first="$(printf '%s' "$out" | sed -n 1p)"
   [ "$(jq -r .number <<<"$first")" = "4" ]
   [ "$(jq -r .body <<<"$first")" = "Fixes: #12 and closes #13" ]
   [ "$(jq -r '.body' <<<"$(printf '%s' "$out" | sed -n 2p)")" = "" ]
