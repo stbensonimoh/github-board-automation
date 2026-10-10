@@ -33,10 +33,20 @@ STAGE_DIR=$(mktemp -d)
 trap 'rm -rf "$STAGE_DIR"' EXIT
 
 STAMP=$(date -u +%Y-%m-%d)
-TARBALL="$STAGE_DIR/evidence-snapshot-$TAG-$STAMP.tar.gz"
+# a git tag may contain slashes; the asset name must not become a path
+ASSET_NAME="evidence-snapshot-${TAG//\//-}-$STAMP.tar.gz"
+TARBALL="$STAGE_DIR/$ASSET_NAME"
 
 # archive relative paths so the snapshot keeps its config subdirectories
 ( cd "$EVIDENCE_DIR" && find . -type f -name '*.json' -print | sort | tar -czf "$TARBALL" -T - )
 
-printf 'attaching %s (%s evidence files) to release %s\n' "${TARBALL##*/}" "$JSON_COUNT" "$TAG"
+# the count and the archive each re-run find: if the list empties in between,
+# GNU tar writes a valid empty archive and the upload would proceed. Recheck
+# the listing; grep -c reads it fully, so tar never takes SIGPIPE under pipefail.
+if [ "$(tar -tzf "$TARBALL" | grep -c .)" -eq 0 ]; then
+  printf 'evidence snapshot is empty\n' >&2
+  exit 1
+fi
+
+printf 'attaching %s (%s evidence files) to release %s\n' "$ASSET_NAME" "$JSON_COUNT" "$TAG"
 gh release upload "$TAG" "$TARBALL" --clobber
