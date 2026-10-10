@@ -79,8 +79,8 @@ Scope rule: org installs MUST set both values as org secrets so participating re
 shellcheck scripts/setup.sh
 actionlint .github/workflows/*.yml
 
-# test setup script
-bats tests/setup.bats
+# run the test suite
+bats tests/
 
 # dry run setup against a test board
 ./scripts/setup.sh --owner TEST-OWNER --project-number 99 --repos TEST-OWNER/test-repo --dry-run
@@ -117,9 +117,16 @@ scripts/
   board-lib.sh                   -> shared helpers: paginated items query, add item, set Status; sourced by both sync and nightly paths
   attach-evidence.sh             -> stages a dated evidence snapshot tarball and uploads it to the release
 tests/
-  setup.bats                     -> setup script unit tests
+  board-lib.bats                 -> unit tests for scripts/board-lib.sh: pagination, id resolution, and conditional Status writes
+  e2e-harness.bats               -> harness unit tests: status polling, evidence JSON shape, and reset
+  mapping.bats                   -> event to status mapping arms extracted from board-automation.yml and exercised with mocked helpers
   parse.bats                     -> close keyword parser unit tests calling scripts/parse-linked.sh with PR body fixtures
-  fixtures/                      -> sample GraphQL responses for Status field and options
+  setup-board.bats               -> setup.sh board discovery and Status option assurance tests
+  setup-place.bats               -> setup.sh secret and variable placement plus caller emit tests
+  templates.bats                 -> template contract tests: triggers, dispatch inputs, 40 line cap, and nightly wiring
+  attach-evidence.bats           -> release snapshot helper tests for scripts/attach-evidence.sh
+  fixtures/                      -> sample API responses for boards, fields, items, issues, PRs, plans, and workflows
+  e2e/                           -> live harness; writes gitignored run evidence under evidence/
 docs/
   install-org.md                 -> org path with org secrets
   install-individual.md          -> personal path with repo secrets
