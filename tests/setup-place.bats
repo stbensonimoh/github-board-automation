@@ -216,10 +216,12 @@ run_setup() {
   [[ "$output" == *"unrecognized token prefix"* ]]
   [[ "$output" == *"ghp_"* ]]
   [[ "$output" == *"github_pat_"* ]]
-  # the rejected token is never echoed and no secret or file is written
+  # the rejected token is never echoed and no secret, variable, or file
+  # write happens
   [[ "$output" != *"not_a_pat_12345"* ]]
   run ! grep -q 'secret set' "$MOCKLOG"
-  run ! grep -q 'contents/' "$MOCKLOG"
+  run ! grep -q 'variable set' "$MOCKLOG"
+  run ! grep -q -- '--method PUT.*contents/' "$MOCKLOG"
 }
 
 @test "a fine grained github_pat_ token is accepted" {
