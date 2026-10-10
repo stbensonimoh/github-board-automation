@@ -151,7 +151,10 @@ extract_revert() {
     # PR body, so the path is absolute and independent of the test cwd
     echo "PARSER=$BATS_TEST_DIRNAME/../scripts/parse-linked.sh"
     echo 'linked_issue_numbers() { printf "12\n"; }'
-    echo 'fetch_all_open_prs_jsonl() { echo "{\"number\": 9, \"body\": \"Closes #12\"}"; }'
+    # a small body never trips the old grep -qx race: the parser must keep
+    # writing refs after grep -qx exits and the printf writer must still be
+    # mid-write, so the ref repeats past the 64 KiB pipe buffer
+    echo "fetch_all_open_prs_jsonl() { printf \"Closes #12 \\n%.0s\" {1..12001} | jq -Rsc '{number: 9, body: .}'; }"
     # PR 9 still closes issue 12: found stays true and gh is never called
     echo 'gh() { printf "%s" "{\"state\": \"open\", \"node_id\": \"NODE_OPEN\"}"; }'
     echo 'set_item_status() { echo "MOVED:$1"; }'
