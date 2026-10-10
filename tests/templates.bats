@@ -93,6 +93,14 @@ NIGHTLY="$BATS_TEST_DIRNAME/../templates/board-nightly-sync.yml"
   grep -q 'items=\$(fetch_all_items' "$NIGHTLY"
 }
 
+@test "reusable workflow guard pins the node_id failure message" {
+  # substring pin, not a whole message pin: the remediation hint inside the
+  # string may change, the "node_id is required" contract must not
+  guard=$(sed -n '/name: Guard node_id presence/,/^[[:space:]]*$/p' "$BATS_TEST_DIRNAME/../.github/workflows/board-automation.yml")
+  [[ "$guard" == *'node_id is required'* ]]
+  [[ "$guard" == *'exit 1'* ]]
+}
+
 @test "both workflows use the shared repo wide concurrency group" {
   # the reusable workflow and the nightly standalone need their own group;
   # the thin caller delegates and inherits the reusable workflow's group

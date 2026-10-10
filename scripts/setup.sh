@@ -117,9 +117,11 @@ resolve_board_id() {
 # option echoed back unchanged (id, name, color, description) and only the
 # missing optional options appended. Identity and existing item field values
 # survive only when each existing option's id is included. Required options
-# that are missing cannot be fixed by a field edit, so that fails loud.
+# that are missing cannot be fixed by a field edit, so that fails loud. The
+# settings URL for that failure arrives as the third argument, so the
+# function reads no globals and stays sourceable on its own.
 ensure_status_options() {
-  local fields="$1" dry_run="$2" name id fid options_gql
+  local fields="$1" dry_run="$2" settings_url="$3" name id fid options_gql
   local -a need=()
   local -a missing_required=()
   for name in Todo "In Progress" Done; do
@@ -128,7 +130,7 @@ ensure_status_options() {
   done
   if [ ${#missing_required[@]} -gt 0 ]; then
     printf 'missing required Status option(s):%s\n' " ${missing_required[*]}" >&2
-    echo "create them in the project settings UI, then rerun setup" >&2
+    echo "create them in the project settings UI at $settings_url, then rerun setup" >&2
     return 1
   fi
 
@@ -342,7 +344,7 @@ main() {
   # shellcheck disable=SC1091
   source "$SCRIPT_DIR/board-lib.sh"
 
-  local fields workflows token mode
+  local fields workflows token mode settings_url
   # validate and normalize the repo list: fully qualified slugs only
   local -a slugs=()
   local slug
@@ -366,7 +368,14 @@ main() {
   echo "board: $BOARD"
 
   fields=$(fetch_fields "$BOARD")
-  ensure_status_options "$fields" "$DRY_RUN"
+  # the missing options failure points at the project settings UI; org and
+  # user owned boards have different URL shapes
+  if [ "$KIND" = "Organization" ]; then
+    settings_url="https://github.com/orgs/$OWNER/projects/$PROJECT_NUMBER/settings"
+  else
+    settings_url="https://github.com/users/$OWNER/projects/$PROJECT_NUMBER/settings"
+  fi
+  ensure_status_options "$fields" "$DRY_RUN" "$settings_url"
 
   workflows=$(gh api graphql -f query='
     query($project: ID!) {
@@ -416,6 +425,17 @@ main() {
     token=$(cat)
   fi
   [ -n "$token" ] || { echo "no token on stdin" >&2; exit 1; }
+
+  # fail fast on a malformed paste: a wrong token would otherwise be stored
+  # as a dead secret. ghp_ is the classic PAT prefix, github_pat_ the fine
+  # grained one. The token itself is never echoed.
+  case "$token" in
+    ghp_* | github_pat_*) ;;
+    *)
+      echo "unrecognized token prefix: the runtime PAT must start with ghp_ or github_pat_" >&2
+      echo "create a classic PAT (ghp_) or a fine grained PAT (github_pat_), then rerun setup" >&2
+      exit 1 ;;
+  esac
 
   # the secret scope decision: org mode only; repo scope is the only option
   # for individuals. The auto detection reads the org plan and the repos'

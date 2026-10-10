@@ -69,6 +69,11 @@ mock_gh_full() {
         fi
         ;;
       *"secret set"* | *"variable set"*)
+        # the real gh reads the value from stdin; drain a piped stdin before
+        # exiting, or the writer races the exit and dies of SIGPIPE under
+        # pipefail. A non pipe stdin (/dev/null, a file) never races, and
+        # draining it could block, so only pipes are read.
+        if [ -p /dev/stdin ]; then cat >/dev/null; fi
         out=''
         ;;
       *"orgs/"*)
@@ -202,6 +207,29 @@ run_setup() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"--token-expiry"* ]]
   run ! grep -q 'secret set' "$MOCKLOG"
+}
+
+@test "a token with an unrecognized prefix fails fast before any write" {
+  mock_gh_full
+  run bash -c "printf '%s' 'not_a_pat_12345' | bash '$SETUP' --owner some-user --project-number 1 --repos some-user/repo --token-expiry 2027-03-01 --individual-mode copy"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unrecognized token prefix"* ]]
+  [[ "$output" == *"ghp_"* ]]
+  [[ "$output" == *"github_pat_"* ]]
+  # the rejected token is never echoed and no secret, variable, or file
+  # write happens
+  [[ "$output" != *"not_a_pat_12345"* ]]
+  run ! grep -q 'secret set' "$MOCKLOG"
+  run ! grep -q 'variable set' "$MOCKLOG"
+  run ! grep -q -- '--method PUT.*contents/' "$MOCKLOG"
+}
+
+@test "a fine grained github_pat_ token is accepted" {
+  mock_gh_full
+  run bash -c "printf '%s' 'github_pat_test_67890' | bash '$SETUP' --owner some-user --project-number 1 --repos some-user/repo --token-expiry 2027-03-01 --individual-mode copy"
+  [ "$status" -eq 0 ]
+  grep -q 'secret set PROJECT_AUTOMATION_TOKEN --repo some-user/repo' "$MOCKLOG"
+  [[ "$output" != *"github_pat_test_67890"* ]]
 }
 
 @test "a dry run without token expiry passes and places nothing" {
