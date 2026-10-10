@@ -140,9 +140,10 @@ jobs:
                 [ "$pr_num" = "$NUMBER" ] && continue
                 pr_body=$(jq -r '.body // ""' <<<"$pr_json")
                 # capture the parser output and match in the shell: a grep -q
-                # consumer exits on the first match, the parser can then die of
-                # SIGPIPE under pipefail, and the if silently reads that as
-                # "not closed by another PR"
+                # consumer exits on the first match, the parser pipeline ends
+                # early, and the printf writer still has data in flight and
+                # dies of SIGPIPE; under pipefail the if then silently reads
+                # that as "not closed by another PR"
                 refs=$(printf '%s' "$pr_body" | bash "$PARSER")
                 case $'\n'"$refs"$'\n' in
                   *$'\n'"$n"$'\n'*)
