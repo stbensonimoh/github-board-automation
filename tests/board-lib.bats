@@ -151,6 +151,16 @@ mock_gh_seq() {
   [ -z "$(item_line "$lines" I_unknownNode00001)" ]
 }
 
+@test "item_line prints only the first row when a content node id repeats" {
+  load_lib
+  # pagination can repeat a row when the API repeats a cursor; the first
+  # match must win and the duplicate must not produce a second line
+  lines=$'PVTI_first0000000\tI_dupNode00000001\tTodo\nPVTI_second000000\tI_dupNode00000001\tDone'
+  out="$(item_line "$lines" I_dupNode00000001)"
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = "1" ]
+  [ "$out" = "$(printf 'PVTI_first0000000\tI_dupNode00000001\tTodo')" ]
+}
+
 @test "write_if_blank adds missing items with the default option" {
   load_lib
   lines="$(items_extract < "$FIXTURES/items-page1.json")"
