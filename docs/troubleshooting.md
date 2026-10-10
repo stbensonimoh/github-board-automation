@@ -60,3 +60,11 @@ underscores, or hyphens.
 
 Setup never places a token without an expiry: add `--token-expiry YYYY-MM-DD`.
 Use `--dry-run` to preview without one.
+
+## setup says unrecognized token prefix
+
+The pasted token is neither a classic `ghp_` token nor a fine grained
+`github_pat_` token. Setup refuses tokens with any other prefix so a dead
+secret never lands. Personal boards: create a classic token with `repo` and
+`project` scopes. Org boards: create a fine grained token with the org
+permissions the guides list. Then rerun setup.
