@@ -119,7 +119,7 @@ resolve_board_id() {
 # survive only when each existing option's id is included. Required options
 # that are missing cannot be fixed by a field edit, so that fails loud.
 ensure_status_options() {
-  local fields="$1" dry_run="$2" name id fid options_gql
+  local fields="$1" dry_run="$2" name id fid options_gql settings_url
   local -a need=()
   local -a missing_required=()
   for name in Todo "In Progress" Done; do
@@ -128,7 +128,14 @@ ensure_status_options() {
   done
   if [ ${#missing_required[@]} -gt 0 ]; then
     printf 'missing required Status option(s):%s\n' " ${missing_required[*]}" >&2
-    echo "create them in the project settings UI, then rerun setup" >&2
+    # the fix is a click away: org and user owned boards have different
+    # settings URL shapes
+    if [ "$KIND" = "Organization" ]; then
+      settings_url="https://github.com/orgs/$OWNER/projects/$PROJECT_NUMBER/settings"
+    else
+      settings_url="https://github.com/users/$OWNER/projects/$PROJECT_NUMBER/settings"
+    fi
+    echo "create them in the project settings UI at $settings_url, then rerun setup" >&2
     return 1
   fi
 

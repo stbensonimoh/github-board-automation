@@ -187,21 +187,24 @@ SCOPE_HEADER_PREFIX="x-oauth-scopes:"
   [[ "$output" == *"99"* ]]
 }
 
-@test "missing required options fail naming them" {
-  mock_gh_board
+@test "missing required options fail naming them and the user settings URL" {
   # the default mock serves the five option fixture; swap fields for the
   # fixture that lacks In Progress
-  gh() {
-    case "$*" in
-      *"fields"*) cat "$FIXTURES/fields-missing-required.json" ;;
-      *"workflows"*) cat "$FIXTURES/workflows-enabled.json" ;;
-      *"projectV2"*) cat "$FIXTURES/board-user.json" ;;
-      *) cat "$FIXTURES/users-user.json" ;;
-    esac
-  }
+  FIELDS_FIXTURE="fields-missing-required.json"
+  mock_gh_board
   run bash "$SETUP" --owner some-user --project-number 1 --repos some-user/repo
   [ "$status" -ne 0 ]
-  [[ "$output" == *"In Progress"* ]]
+  [[ "$output" == *"missing required Status option(s): In Progress"* ]]
+  [[ "$output" == *"https://github.com/users/some-user/projects/1/settings"* ]]
+}
+
+@test "missing required options fail naming them and the org settings URL" {
+  FIELDS_FIXTURE="fields-missing-required.json"
+  mock_gh_board
+  run bash "$SETUP" --owner org-owner --project-number 7 --repos org-owner/repo
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing required Status option(s): In Progress"* ]]
+  [[ "$output" == *"https://github.com/orgs/org-owner/projects/7/settings"* ]]
 }
 
 @test "dry run prints the plan and never mutates" {
